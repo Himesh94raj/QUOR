@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="quor-glowing-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#9d1cff" />
+    </linearGradient>
+    <linearGradient id="quor-border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#3b82f6" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#9d1cff" stop-opacity="0.8" />
+    </linearGradient>
+    <filter id="quor-neon-glow" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Solid dark background of the tile to match the uploaded design -->
+  <rect width="100" height="100" rx="22" fill="#060814" />
+  
+  <!-- Sleek neon border -->
+  <rect x="1.5" y="1.5" width="97" height="97" rx="20.5" stroke="url(#quor-border-gradient)" stroke-width="2" />
+
+  <!-- Futuristic Q Ring -->
+  <circle
+    cx="48"
+    cy="48"
+    r="26"
+    stroke="url(#quor-glowing-gradient)"
+    stroke-width="11"
+    fill="none"
+    filter="url(#quor-neon-glow)"
+  />
+
+  <!-- Q Tail -->
+  <path
+    d="M 62 62 L 78 78"
+    stroke="url(#quor-glowing-gradient)"
+    stroke-width="11"
+    stroke-linecap="square"
+    filter="url(#quor-neon-glow)"
+  />
+</svg>

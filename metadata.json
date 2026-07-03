@@ -1,0 +1,6 @@
+{
+  "name": "QUOR",
+  "description": "Full-stack Video Clipping Marketplace for creators & clippers with automated view tracking, wallet payments, KYC verification, and comprehensive admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

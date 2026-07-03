@@ -1,0 +1,187 @@
+{
+  "users": [
+    {
+      "id": "admin-1",
+      "name": "QUOR Admin",
+      "email": "admin@quor.in",
+      "password": "admin",
+      "role": "admin",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "aarav-admin",
+      "name": "Aarav Raut",
+      "email": "aarav63raut@gmail.com",
+      "password": "password123",
+      "role": "admin",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "creator-hassan",
+      "name": "Hassan Choudhury",
+      "email": "hassan@tech.io",
+      "password": "password123",
+      "role": "creator",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "creator-shradha",
+      "name": "Shradha Khapra",
+      "email": "shradha@edtech.com",
+      "password": "password123",
+      "role": "creator",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "clipper-sam",
+      "name": "Samir Kulkarni",
+      "email": "samir@editor.com",
+      "password": "password123",
+      "role": "clipper",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "clipper-riya",
+      "name": "Riya Verma",
+      "email": "riya@editor.com",
+      "password": "password123",
+      "role": "clipper",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    }
+  ],
+  "clipperProfiles": {
+    "clipper-sam": {
+      "userId": "clipper-sam",
+      "upiId": "samir@okaxis",
+      "instagramHandle": "sam_clips_tech",
+      "youtubeHandle": "sam_shorts",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=60",
+      "kycAadhaar": "4567 8901 2345",
+      "kycPan": "ABCDE1234F"
+    },
+    "clipper-riya": {
+      "userId": "clipper-riya",
+      "upiId": "riya@okicici",
+      "instagramHandle": "riya_edits_ig",
+      "youtubeHandle": "riya_cuts_yt",
+      "kycStatus": "Pending",
+      "kycDocUrl": "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=60",
+      "kycAadhaar": "9876 5432 1098",
+      "kycPan": "XYZW9876A"
+    }
+  },
+  "creatorProfiles": {
+    "creator-hassan": {
+      "userId": "creator-hassan",
+      "channelUrl": "https://youtube.com/c/HassanTechShow",
+      "walletBalance": 15400
+    },
+    "creator-shradha": {
+      "userId": "creator-shradha",
+      "channelUrl": "https://youtube.com/c/ApnaCollege",
+      "walletBalance": 8000
+    }
+  },
+  "campaigns": [
+    {
+      "id": "campaign-1",
+      "creatorId": "creator-hassan",
+      "creatorName": "Hassan Choudhury",
+      "title": "Ultimate 2026 AI Roadmap Video Clips",
+      "sourceVideoUrl": "https://www.youtube.com/watch?v=road123",
+      "cpm": 250,
+      "budget": 10000,
+      "spent": 2400,
+      "instructions": "Extract high-impact tips about AI agents. Keep clips between 20-55 seconds. Add bold auto-captions and a zoom transition on important points.",
+      "platform": "both",
+      "minDuration": 20,
+      "deadline": "2026-07-31",
+      "status": "Active",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "campaign-2",
+      "creatorId": "creator-shradha",
+      "creatorName": "Shradha Khapra",
+      "title": "React 19 Hooks Tutorial Clips",
+      "sourceVideoUrl": "https://www.youtube.com/watch?v=react19",
+      "cpm": 200,
+      "budget": 5000,
+      "spent": 0,
+      "instructions": "Focus on the useActionState hook. Cut the code explanation down to 40 seconds. Highlight the loading boundary.",
+      "platform": "youtube",
+      "minDuration": 30,
+      "deadline": "2026-08-15",
+      "status": "Active",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    }
+  ],
+  "submissions": [
+    {
+      "id": "sub-1",
+      "campaignId": "campaign-1",
+      "campaignTitle": "Ultimate 2026 AI Roadmap Video Clips",
+      "clipperId": "clipper-sam",
+      "clipperName": "Samir Kulkarni",
+      "submittedUrl": "https://youtube.com/shorts/awesome_shorts_1",
+      "status": "Approved",
+      "feedback": "Great edits on this clip! Subtitles are extremely visible.",
+      "approvedAt": "2026-07-01T18:08:12.308Z",
+      "views": 12000,
+      "lastFetchedViews": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "sub-2",
+      "campaignId": "campaign-2",
+      "campaignTitle": "React 19 Hooks Tutorial Clips",
+      "clipperId": "clipper-sam",
+      "clipperName": "Samir Kulkarni",
+      "submittedUrl": "https://instagram.com/reels/react19_speed",
+      "status": "Pending",
+      "views": 0,
+      "lastFetchedViews": null,
+      "approvedAt": null
+    }
+  ],
+  "walletHistory": [
+    {
+      "id": "tx-1",
+      "userId": "creator-hassan",
+      "type": "deposit",
+      "amount": 15400,
+      "status": "Completed",
+      "description": "Fund Added via Razorpay",
+      "createdAt": "2026-06-29T18:08:12.308Z"
+    },
+    {
+      "id": "tx-2",
+      "userId": "creator-hassan",
+      "type": "payment",
+      "amount": 2400,
+      "status": "Completed",
+      "description": "Payout for Samir Kulkarni (sub-1) views",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    },
+    {
+      "id": "tx-3",
+      "userId": "clipper-sam",
+      "type": "payment",
+      "amount": 2400,
+      "status": "Completed",
+      "description": "Earned ₹1920 (80% from CPM ₹250 for 12,000 views, Platform Commission ₹480)",
+      "createdAt": "2026-07-01T18:08:12.308Z"
+    }
+  ],
+  "payoutRequests": [
+    {
+      "id": "payout-1",
+      "clipperId": "clipper-sam",
+      "clipperName": "Samir Kulkarni",
+      "upiId": "samir@okaxis",
+      "amount": 1000,
+      "status": "Completed",
+      "createdAt": "2026-06-30T18:08:12.308Z"
+    }
+  ]
+}
