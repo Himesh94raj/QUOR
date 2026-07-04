@@ -1,5 +1,5 @@
 const getApiBase = (): string => {
-  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) return envUrl;
 
   if (typeof window !== "undefined") {
@@ -12,7 +12,7 @@ const getApiBase = (): string => {
   }
 
   // Default to the Railway production backend for external deployments like Vercel
-  return "https://quor-production.up.railway.app";
+  return "https://quor-production-f440.up.railway.app";
 };
 
 export const API_BASE = getApiBase();
