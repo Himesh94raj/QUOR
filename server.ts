@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcryptjs";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage } from "./src/types.js";
@@ -244,6 +245,8 @@ const saveDb = (db: DbSchema) => {
 
 // Helper to load database
 const loadDb = (): DbSchema => {
+  let db: DbSchema;
+
   if (!fs.existsSync(FILE_PATH)) {
     const initialDb: DbSchema = {
       users: [
@@ -414,7 +417,7 @@ const loadDb = (): DbSchema => {
           id: "tx-3",
           userId: "clipper-sam",
           type: "payment",
-          amount: 2400, // clipper gets 80% of CPM, wait! Let's verify commission logic below
+          amount: 2400,
           status: "Completed",
           description: "Earned ₹1920 (80% from CPM ₹250 for 12,000 views, Platform Commission ₹480)",
           createdAt: new Date().toISOString()
@@ -432,25 +435,41 @@ const loadDb = (): DbSchema => {
         }
       ]
     };
+    db = initialDb;
     saveDb(initialDb);
-    return initialDb;
+  } else {
+    try {
+      const raw = fs.readFileSync(FILE_PATH, "utf8");
+      db = JSON.parse(raw);
+    } catch (e) {
+      console.error("Error reading db client", e);
+      db = {
+        users: [],
+        clipperProfiles: {},
+        creatorProfiles: {},
+        campaigns: [],
+        submissions: [],
+        walletHistory: [],
+        payoutRequests: []
+      };
+    }
   }
-  
-  try {
-    const raw = fs.readFileSync(FILE_PATH, "utf8");
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error("Error reading db client", e);
-    return {
-      users: [],
-      clipperProfiles: {},
-      creatorProfiles: {},
-      campaigns: [],
-      submissions: [],
-      walletHistory: [],
-      payoutRequests: []
-    };
+
+  // Ensure all users have hashed passwords
+  let updated = false;
+  db.users = db.users.map((user) => {
+    if (user.password && !user.password.startsWith("$2a$") && !user.password.startsWith("$2b$") && !user.password.startsWith("$2y$")) {
+      user.password = bcrypt.hashSync(user.password, 10);
+      updated = true;
+    }
+    return user;
+  });
+
+  if (updated) {
+    saveDb(db);
   }
+
+  return db;
 };
 
 const startServer = async () => {
@@ -540,7 +559,7 @@ const startServer = async () => {
       id: userId,
       name,
       email,
-      password, // In a real app we'd hash, but simple storage is fine here
+      password: bcrypt.hashSync(password, 10),
       role,
       createdAt: new Date().toISOString(),
     };
@@ -589,7 +608,8 @@ const startServer = async () => {
       saveDb(db);
     }
 
-    if (!user || user.password !== password) {
+    const isPasswordValid = user && bcrypt.compareSync(password, user.password);
+    if (!user || !isPasswordValid) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
