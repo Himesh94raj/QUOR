@@ -21,6 +21,10 @@ if (!supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+console.log("SUPABASE URL:", supabaseUrl);
+console.log("SERVICE ROLE PRESENT:", !!supabaseKey);
+console.log("SERVICE ROLE PREFIX:", supabaseKey.substring(0, 20));
+
 // Async helper to sync to Supabase
 const syncToSupabase = async (db: DbSchema) => {
   try {
