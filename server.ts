@@ -27,26 +27,19 @@ console.log("SERVICE ROLE PRESENT:", !!supabaseKey);
 console.log("SERVICE ROLE PREFIX:", supabaseKey ? supabaseKey.substring(0, 20) : "MISSING");
 console.log("====================================");
 
+let isSyncing = false;
+
 // Async helper to sync to Supabase
 const syncToSupabase = async (db: DbSchema) => {
+  if (isSyncing) {
+    console.log("Supabase Sync: Skipping execution because a sync is already in progress to prevent race conditions.");
+    return;
+  }
+  isSyncing = true;
   try {
-    console.log("Supabase: Initiating sync...");
+    console.log("Supabase: Initiating sync in safe dependency order...");
 
-    // 1. Try to sync entire state to a single master row as a general backup
-    try {
-      const { error } = await supabase
-        .from("trov_state")
-        .upsert({ id: "current", state: db, updated_at: new Date().toISOString() }, { onConflict: "id" });
-      if (error) {
-        console.warn("Supabase: 'trov_state' sync skipped or failed (table might not exist yet):", error.message);
-      } else {
-        console.log("Supabase: Entire database state synced successfully to 'trov_state'");
-      }
-    } catch (e: any) {
-      console.warn("Supabase 'trov_state' sync exception:", e.message || e);
-    }
-
-    // 2. Try to sync individual users table
+    // 1. Try to sync individual users table first (Parent of profiles, campaigns, etc.)
     try {
       if (db.users && db.users.length > 0) {
         // Fetch all existing users from Supabase to align IDs and prevent duplicate email conflicts
@@ -178,7 +171,50 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase users sync exception:", e.message || e);
     }
 
-    // 3. Try to sync campaigns table
+    // 2. Try to sync clipper_profiles table
+    try {
+      if (db.clipperProfiles && Object.keys(db.clipperProfiles).length > 0) {
+        const rows = Object.values(db.clipperProfiles).map(p => ({
+          user_id: p.userId,
+          upi_id: p.upiId,
+          instagram_handle: p.instagramHandle,
+          youtube_handle: p.youtubeHandle,
+          kyc_status: p.kycStatus,
+          kyc_doc_url: p.kycDocUrl,
+          kyc_aadhaar: p.kycAadhaar,
+          kyc_pan: p.kycPan
+        }));
+        const { error } = await supabase.from("clipper_profiles").upsert(rows, { onConflict: "user_id" });
+        if (error) {
+          console.warn("Supabase: 'clipper_profiles' table sync skipped:", error.message);
+        } else {
+          console.log(`Supabase: Synced ${rows.length} clipper_profiles successfully`);
+        }
+      }
+    } catch (e: any) {
+      console.warn("Supabase clipper_profiles sync exception:", e.message || e);
+    }
+
+    // 3. Try to sync creator_profiles table
+    try {
+      if (db.creatorProfiles && Object.keys(db.creatorProfiles).length > 0) {
+        const rows = Object.values(db.creatorProfiles).map(p => ({
+          user_id: p.userId,
+          channel_url: p.channelUrl,
+          wallet_balance: p.walletBalance
+        }));
+        const { error } = await supabase.from("creator_profiles").upsert(rows, { onConflict: "user_id" });
+        if (error) {
+          console.warn("Supabase: 'creator_profiles' table sync skipped:", error.message);
+        } else {
+          console.log(`Supabase: Synced ${rows.length} creator_profiles successfully`);
+        }
+      }
+    } catch (e: any) {
+      console.warn("Supabase creator_profiles sync exception:", e.message || e);
+    }
+
+    // 4. Try to sync campaigns table
     try {
       if (db.campaigns && db.campaigns.length > 0) {
         const rows = db.campaigns.map(c => ({
@@ -207,7 +243,7 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase campaigns sync exception:", e.message || e);
     }
 
-    // 4. Try to sync submissions table
+    // 5. Try to sync submissions table
     try {
       if (db.submissions && db.submissions.length > 0) {
         const rows = db.submissions.map(s => ({
@@ -234,50 +270,7 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase submissions sync exception:", e.message || e);
     }
 
-    // 5. Try to sync clipper_profiles table
-    try {
-      if (db.clipperProfiles && Object.keys(db.clipperProfiles).length > 0) {
-        const rows = Object.values(db.clipperProfiles).map(p => ({
-          user_id: p.userId,
-          upi_id: p.upiId,
-          instagram_handle: p.instagramHandle,
-          youtube_handle: p.youtubeHandle,
-          kyc_status: p.kycStatus,
-          kyc_doc_url: p.kycDocUrl,
-          kyc_aadhaar: p.kycAadhaar,
-          kyc_pan: p.kycPan
-        }));
-        const { error } = await supabase.from("clipper_profiles").upsert(rows, { onConflict: "user_id" });
-        if (error) {
-          console.warn("Supabase: 'clipper_profiles' table sync skipped:", error.message);
-        } else {
-          console.log(`Supabase: Synced ${rows.length} clipper_profiles successfully`);
-        }
-      }
-    } catch (e: any) {
-      console.warn("Supabase clipper_profiles sync exception:", e.message || e);
-    }
-
-    // 6. Try to sync creator_profiles table
-    try {
-      if (db.creatorProfiles && Object.keys(db.creatorProfiles).length > 0) {
-        const rows = Object.values(db.creatorProfiles).map(p => ({
-          user_id: p.userId,
-          channel_url: p.channelUrl,
-          wallet_balance: p.walletBalance
-        }));
-        const { error } = await supabase.from("creator_profiles").upsert(rows, { onConflict: "user_id" });
-        if (error) {
-          console.warn("Supabase: 'creator_profiles' table sync skipped:", error.message);
-        } else {
-          console.log(`Supabase: Synced ${rows.length} creator_profiles successfully`);
-        }
-      }
-    } catch (e: any) {
-      console.warn("Supabase creator_profiles sync exception:", e.message || e);
-    }
-
-    // 7. Try to sync wallet_history table
+    // 6. Try to sync wallet_history table
     try {
       if (db.walletHistory && db.walletHistory.length > 0) {
         const rows = db.walletHistory.map(w => ({
@@ -300,7 +293,7 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase wallet_history sync exception:", e.message || e);
     }
 
-    // 8. Try to sync payout_requests table
+    // 7. Try to sync payout_requests table
     try {
       if (db.payoutRequests && db.payoutRequests.length > 0) {
         const rows = db.payoutRequests.map(p => ({
@@ -323,7 +316,7 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase payout_requests sync exception:", e.message || e);
     }
 
-    // 9. Try to sync contacts / tickets table
+    // 8. Try to sync contacts / tickets table
     try {
       if (db.contacts && db.contacts.length > 0) {
         const rows = db.contacts.map(c => ({
@@ -345,8 +338,24 @@ const syncToSupabase = async (db: DbSchema) => {
       console.warn("Supabase contacts sync exception:", e.message || e);
     }
 
+    // 9. Try to sync entire state to a master backup table at the end
+    try {
+      const { error } = await supabase
+        .from("trov_state")
+        .upsert({ id: "current", state: db, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      if (error) {
+        console.warn("Supabase: 'trov_state' sync skipped or failed (table might not exist yet):", error.message);
+      } else {
+        console.log("Supabase: Entire database state synced successfully to 'trov_state'");
+      }
+    } catch (e: any) {
+      console.warn("Supabase 'trov_state' sync exception:", e.message || e);
+    }
+
   } catch (err: any) {
     console.error("General Supabase sync failure:", err.message || err);
+  } finally {
+    isSyncing = false;
   }
 };
 
@@ -374,9 +383,9 @@ const loadDb = (): DbSchema => {
           createdAt: new Date().toISOString(),
         },
         {
-          id: "aarav-admin",
-          name: "Aarav Raut",
-          email: "aarav63raut@gmail.com",
+          id: "owner-admin",
+          name: "Owner Administrator",
+          email: process.env.OWNER_EMAIL || "owner@quor.in",
           password: "password123",
           role: "admin",
           createdAt: new Date().toISOString(),
@@ -708,6 +717,27 @@ const startServer = async () => {
     next();
   };
 
+  // Reusable Middleware to restrict access to only the designated Owner Administrator
+  const requireOwnerAdmin = (req: any, res: any, next: any) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized access. No session found." });
+    }
+
+    const ownerEmail = process.env.OWNER_EMAIL;
+    if (!ownerEmail) {
+      console.error("ADMIN SECURITY CONFIG ERROR: OWNER_EMAIL environment variable is not defined!");
+      return res.status(403).json({ error: "Access Forbidden. Administrator security configuration is missing." });
+    }
+
+    if (user.role !== "admin" || !user.email || user.email.toLowerCase() !== ownerEmail.toLowerCase()) {
+      console.warn(`SECURITY ALERT: Unauthorized admin access attempt to restricted endpoint by user ${user.email || "unknown"} (role: ${user.role || "none"}). Required Owner: ${ownerEmail}`);
+      return res.status(403).json({ error: "Access Denied. Only the designated Owner Administrator can perform this action." });
+    }
+
+    next();
+  };
+
   // Auth Endpoints
   app.post("/api/auth/signup", async (req, res) => {
     try {
@@ -785,11 +815,13 @@ const startServer = async () => {
         }
       }
 
+      const isOwnerAdmin = role === "admin" && email && process.env.OWNER_EMAIL && email.toLowerCase() === process.env.OWNER_EMAIL.toLowerCase() ? true : false;
       res.status(201).json({
         id: userId,
         name,
         email,
         role,
+        isOwnerAdmin
       });
     } catch (err: any) {
       console.error("Signup catch error:", err);
@@ -816,8 +848,9 @@ const startServer = async () => {
         return res.status(500).json({ error: "Authentication service unavailable." });
       }
 
-      // Auto-bootstrap any aarav63raut@gmail.com login as Admin in Supabase
-      if (user && email.toLowerCase() === "aarav63raut@gmail.com" && user.role !== "admin") {
+      // Auto-bootstrap any OWNER_EMAIL login as Admin in Supabase
+      const ownerEmail = process.env.OWNER_EMAIL;
+      if (user && ownerEmail && email.toLowerCase() === ownerEmail.toLowerCase() && user.role !== "admin") {
         user.role = "admin";
         await supabase
           .from("users")
@@ -854,11 +887,13 @@ const startServer = async () => {
         }
       }
 
+      const isOwnerAdmin = user.role === "admin" && user.email && ownerEmail && user.email.toLowerCase() === ownerEmail.toLowerCase() ? true : false;
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        isOwnerAdmin
       });
     } catch (err: any) {
       console.error("Login catch error:", err);
@@ -867,11 +902,14 @@ const startServer = async () => {
   });
 
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
+    const ownerEmail = process.env.OWNER_EMAIL;
+    const isOwnerAdmin = req.user.role === "admin" && req.user.email && ownerEmail && req.user.email.toLowerCase() === ownerEmail.toLowerCase() ? true : false;
     res.json({
       id: req.user.id,
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
+      isOwnerAdmin
     });
   });
 
@@ -1286,8 +1324,7 @@ const startServer = async () => {
   });
 
   // Admin Queue Actions
-  app.get("/api/admin/users", authenticateUser, (req: any, res) => {
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only." });
+  app.get("/api/admin/users", authenticateUser, requireOwnerAdmin, (req: any, res) => {
     const db = loadDb();
     const enrichedUsers = db.users.map(u => {
       const clipperProfile = db.clipperProfiles[u.id] || null;
@@ -1307,8 +1344,7 @@ const startServer = async () => {
     res.json(enrichedUsers);
   });
 
-  app.post("/api/admin/users/:userId/status", authenticateUser, (req: any, res) => {
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only." });
+  app.post("/api/admin/users/:userId/status", authenticateUser, requireOwnerAdmin, (req: any, res) => {
     const { userId } = req.params;
     const { status, durationDays, reason } = req.body; // status: "active", "suspended", "banned"
 
@@ -1349,8 +1385,7 @@ const startServer = async () => {
     res.json({ message: `User status successfully updated to ${status}.`, user: targetedUser });
   });
 
-  app.post("/api/admin/kyc/:userId", authenticateUser, (req: any, res) => {
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only." });
+  app.post("/api/admin/kyc/:userId", authenticateUser, requireOwnerAdmin, (req: any, res) => {
     const { userId } = req.params;
     const { status } = req.body; // Verified or Rejected
 
@@ -1365,8 +1400,7 @@ const startServer = async () => {
     res.json({ message: `Clipper KYC is successfully updated to ${status}.`, profile });
   });
 
-  app.post("/api/admin/payouts/:payoutId", authenticateUser, (req: any, res) => {
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only." });
+  app.post("/api/admin/payouts/:payoutId", authenticateUser, requireOwnerAdmin, (req: any, res) => {
     const { payoutId } = req.params;
     const { status } = req.body; // Completed or Failed
 

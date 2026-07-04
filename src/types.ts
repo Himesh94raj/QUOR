@@ -7,6 +7,7 @@ export interface User {
   password?: string;
   role: UserRole;
   createdAt: string;
+  isOwnerAdmin?: boolean;
   clipperProfile?: ClipperProfile | null;
   creatorProfile?: CreatorProfile | null;
   submissions?: Submission[];

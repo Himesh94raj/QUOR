@@ -159,7 +159,7 @@ export default function App() {
       
       // Auto routing deep locks
       if (currentRoute === "/auth/login" || currentRoute === "/auth/signup") {
-        if (user.role === "admin") setRoute("/admin");
+        if (user.role === "admin" && user.isOwnerAdmin) setRoute("/admin");
         else if (user.role === "creator") setRoute("/dashboard/creator");
         else setRoute("/dashboard/clipper");
       }
@@ -171,6 +171,19 @@ export default function App() {
       setCreatorProfile(null);
     }
   }, [user]);
+
+  // Admin Route Security Guard
+  useEffect(() => {
+    if (currentRoute.startsWith("/admin")) {
+      if (!user) {
+        showToast("Please log in first to access the administrator panel.", "error");
+        setRoute("/");
+      } else if (user.role !== "admin" || !user.isOwnerAdmin) {
+        showToast("Access Denied. Only the designated Owner Administrator can access the Admin Dashboard.", "error");
+        setRoute("/");
+      }
+    }
+  }, [currentRoute, user]);
 
   // Hook into Route state changes explicitly to sync view panels
   const setRoute = (path: string) => {
@@ -1034,12 +1047,12 @@ export default function App() {
                 </div>
 
                 <div 
-                  onClick={() => { setLoginEmail("admin@quor.in"); setLoginPass("admin"); }}
+                  onClick={() => { setLoginEmail(""); setLoginPass(""); }}
                   className="p-2 bg-[#0c0f17] rounded-xl border border-gray-850 hover:border-cyan-500/40 cursor-pointer text-left sm:col-span-2"
                 >
                   <strong className="text-red-400 block text-[10px] uppercase font-mono">3. LOGIN AS QUOR ADMIN</strong>
-                  Email: <span className="text-white">admin@quor.in</span> (or matching user: aarav63raut@gmail.com)<br/>
-                  Pass: <span className="text-white">admin</span> (or password123)
+                  Email: <span className="text-white">Configured OWNER_EMAIL</span><br/>
+                  Pass: <span className="text-white">password123 (or admin)</span>
                 </div>
               </div>
             </div>
@@ -2079,7 +2092,7 @@ export default function App() {
         )}
 
         {/* ROUTE 9: PROTECTED - ADMIN PANEL MASTER CONTROL */}
-        {currentRoute.startsWith("/admin") && user?.role === "admin" && (
+        {currentRoute.startsWith("/admin") && user?.role === "admin" && user?.isOwnerAdmin && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Admin Header / Sidebar switcher */}
             <div className="space-y-3">

@@ -89,13 +89,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {/* Dashboard Hub button */}
                 <button
                   onClick={() => {
-                    if (user.role === "admin") setRoute("/admin");
+                    if (user.role === "admin" && user.isOwnerAdmin) setRoute("/admin");
                     else if (user.role === "creator") setRoute("/dashboard/creator");
                     else setRoute("/dashboard/clipper");
                   }}
                   className="flex items-center space-x-1.5 bg-[#171e2e] hover:bg-[#20293c] text-white border border-gray-800 rounded-lg py-1.5 px-3 text-xs transition-all pointer-events-auto cursor-pointer"
                 >
-                  {user.role === "admin" ? (
+                  {user.role === "admin" && user.isOwnerAdmin ? (
                     <Shield className="w-3.5 h-3.5 text-red-400" />
                   ) : (
                     <LayoutDashboard className="w-3.5 h-3.5 text-cyan-400" />
