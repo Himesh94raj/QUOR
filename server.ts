@@ -49,20 +49,25 @@ const syncToSupabase = async (db: DbSchema) => {
     // 2. Try to sync individual users table
     try {
       if (db.users && db.users.length > 0) {
-        const rows = db.users.map(u => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          status: u.status || "active",
-          status_reason: u.statusReason || "",
-          created_at: u.createdAt
-        }));
-        const { error } = await supabase.from("users").upsert(rows, { onConflict: "id" });
-        if (error) {
-          console.warn("Supabase: 'users' table sync skipped:", error.message);
-        } else {
-          console.log(`Supabase: Synced ${rows.length} users successfully`);
+        const rows = db.users
+          .filter(u => u.password)
+          .map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            password: u.password,
+            role: u.role,
+            status: u.status || "active",
+            status_reason: u.statusReason || "",
+            created_at: u.createdAt
+          }));
+        if (rows.length > 0) {
+          const { error } = await supabase.from("users").upsert(rows, { onConflict: "id" });
+          if (error) {
+            console.warn("Supabase: 'users' table sync skipped:", error.message);
+          } else {
+            console.log(`Supabase: Synced ${rows.length} users successfully`);
+          }
         }
       }
     } catch (e: any) {
