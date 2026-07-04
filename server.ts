@@ -49,6 +49,109 @@ const syncToSupabase = async (db: DbSchema) => {
     // 2. Try to sync individual users table
     try {
       if (db.users && db.users.length > 0) {
+        // Fetch all existing users from Supabase to align IDs and prevent duplicate email conflicts
+        const { data: supabaseUsers, error: fetchErr } = await supabase
+          .from("users")
+          .select("id, email");
+
+        const emailToSupabaseIdMap = new Map<string, string>();
+        if (!fetchErr && supabaseUsers) {
+          for (const sUser of supabaseUsers) {
+            if (sUser.email) {
+              emailToSupabaseIdMap.set(sUser.email.toLowerCase(), sUser.id);
+            }
+          }
+        }
+
+        let dbModified = false;
+
+        // Dedup local db.users by email internally before mapping
+        const uniqueLocalUsers: User[] = [];
+        const seenLocalEmails = new Set<string>();
+        for (const u of db.users) {
+          const emailLower = u.email.toLowerCase();
+          if (!seenLocalEmails.has(emailLower)) {
+            seenLocalEmails.add(emailLower);
+            uniqueLocalUsers.push(u);
+          } else {
+            dbModified = true; // removed local duplicate
+          }
+        }
+        db.users = uniqueLocalUsers;
+
+        // Check for mismatches between local IDs and Supabase IDs for matching emails
+        for (const user of db.users) {
+          const emailLower = user.email.toLowerCase();
+          const existingSupabaseId = emailToSupabaseIdMap.get(emailLower);
+          if (existingSupabaseId && existingSupabaseId !== user.id) {
+            const oldId = user.id;
+            const newId = existingSupabaseId;
+            console.log(`Supabase Sync: Resolving ID mismatch for ${user.email}. Aligning local ID ${oldId} to Supabase ID ${newId}`);
+
+            user.id = newId;
+            dbModified = true;
+
+            // Cascade ID updates to other tables in local memory database
+            // clipperProfiles
+            if (db.clipperProfiles && db.clipperProfiles[oldId]) {
+              const profile = db.clipperProfiles[oldId];
+              profile.userId = newId;
+              db.clipperProfiles[newId] = profile;
+              delete db.clipperProfiles[oldId];
+            }
+
+            // creatorProfiles
+            if (db.creatorProfiles && db.creatorProfiles[oldId]) {
+              const profile = db.creatorProfiles[oldId];
+              profile.userId = newId;
+              db.creatorProfiles[newId] = profile;
+              delete db.creatorProfiles[oldId];
+            }
+
+            // campaigns
+            if (db.campaigns) {
+              db.campaigns.forEach(c => {
+                if (c.creatorId === oldId) {
+                  c.creatorId = newId;
+                }
+              });
+            }
+
+            // submissions
+            if (db.submissions) {
+              db.submissions.forEach(s => {
+                if (s.clipperId === oldId) {
+                  s.clipperId = newId;
+                }
+              });
+            }
+
+            // walletHistory
+            if (db.walletHistory) {
+              db.walletHistory.forEach(w => {
+                if (w.userId === oldId) {
+                  w.userId = newId;
+                }
+              });
+            }
+
+            // payoutRequests
+            if (db.payoutRequests) {
+              db.payoutRequests.forEach(p => {
+                if (p.clipperId === oldId) {
+                  p.clipperId = newId;
+                }
+              });
+            }
+          }
+        }
+
+        // Save adjusted database to prevent future mismatches and keep local JSON and related tables in complete sync
+        if (dbModified) {
+          fs.writeFileSync(FILE_PATH, JSON.stringify(db, null, 2), "utf8");
+          console.log("Supabase Sync: Successfully aligned local user IDs and relation keys with Supabase");
+        }
+
         const rows = db.users
           .filter(u => u.password)
           .map(u => ({
@@ -61,6 +164,7 @@ const syncToSupabase = async (db: DbSchema) => {
             status_reason: u.statusReason || "",
             created_at: u.createdAt
           }));
+
         if (rows.length > 0) {
           const { error } = await supabase.from("users").upsert(rows, { onConflict: "id" });
           if (error) {
