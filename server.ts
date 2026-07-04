@@ -509,12 +509,63 @@ const startServer = async () => {
   // Set up API routes
   
   // Custom Auth Middleware representation
-  const authenticateUser = (req: any, res: any, next: any) => {
+  const authenticateUser = async (req: any, res: any, next: any) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized access. No session found." });
     }
     const userId = authHeader.split(" ")[1];
+
+    try {
+      // 1. Try fetching from Supabase first to support new registrations
+      const { data: user, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (user && !error) {
+        const userStatus = user.status;
+        const statusUntil = user.status_until || user.statusUntil;
+        const statusReason = user.status_reason || user.statusReason;
+
+        // Check suspension/ban status
+        if (userStatus === "banned") {
+          return res.status(403).json({ error: `This account has been PERMANENTLY BANNED. Reason: ${statusReason || "Policy violation"}` });
+        }
+        if (userStatus === "suspended" && statusUntil) {
+          const untilDate = new Date(statusUntil);
+          if (untilDate > new Date()) {
+            return res.status(403).json({ error: `This account is SUSPENDED until ${untilDate.toLocaleString("en-IN")}. Reason: ${statusReason || "Temporary cool-off"}` });
+          } else {
+            // Automatically lift suspension in Supabase
+            await supabase
+              .from("users")
+              .update({ status: "active", status_until: null, status_reason: "" })
+              .eq("id", user.id);
+            user.status = "active";
+            user.status_until = null;
+            user.status_reason = "";
+          }
+        }
+
+        req.user = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          status: user.status || "active",
+          statusUntil: user.status_until || user.statusUntil || null,
+          statusReason: user.status_reason || user.statusReason || "",
+          createdAt: user.created_at || user.createdAt
+        };
+        return next();
+      }
+    } catch (e) {
+      console.error("authenticateUser Supabase error:", e);
+    }
+
+    // 2. Fallback to local DB for legacy compatibility
     const db = loadDb();
     const user = db.users.find((u) => u.id === userId);
     if (!user) {
@@ -543,99 +594,161 @@ const startServer = async () => {
   };
 
   // Auth Endpoints
-  app.post("/api/auth/signup", (req, res) => {
-    const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ error: "Missing required signup fields." });
-    }
-    const db = loadDb();
-    const existing = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      return res.status(400).json({ error: "Email is already registered." });
-    }
-    
-    const userId = "user-" + Math.random().toString(36).substring(2, 9);
-    const newUser: User = {
-      id: userId,
-      name,
-      email,
-      password: bcrypt.hashSync(password, 10),
-      role,
-      createdAt: new Date().toISOString(),
-    };
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { name, email, password, role } = req.body;
+      if (!name || !email || !password || !role) {
+        return res.status(400).json({ error: "Missing required signup fields." });
+      }
 
-    db.users.push(newUser);
+      // 1. Check if email is already registered in Supabase
+      const { data: existing, error: checkError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email.toLowerCase())
+        .maybeSingle();
 
-    if (role === "clipper") {
-      db.clipperProfiles[userId] = {
-        userId,
-        upiId: "",
-        instagramHandle: "",
-        youtubeHandle: "",
-        kycStatus: "Pending",
-        kycDocUrl: "",
-        kycAadhaar: "",
-        kycPan: ""
-      };
-    } else if (role === "creator") {
-      db.creatorProfiles[userId] = {
-        userId,
-        channelUrl: "",
-        walletBalance: 0,
-      };
+      if (checkError) {
+        console.error("Supabase signup check error:", checkError);
+        return res.status(500).json({ error: "Signup service unavailable." });
+      }
+
+      if (existing) {
+        return res.status(400).json({ error: "Email is already registered." });
+      }
+
+      const userId = "user-" + Math.random().toString(36).substring(2, 9);
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      const createdAt = new Date().toISOString();
+
+      // 2. Insert into Supabase users table
+      const { error: insertError } = await supabase
+        .from("users")
+        .insert([{
+          id: userId,
+          name,
+          email,
+          password: hashedPassword,
+          role,
+          status: "active",
+          status_reason: "",
+          created_at: createdAt
+        }]);
+
+      if (insertError) {
+        console.error("Supabase user insert error:", insertError);
+        return res.status(500).json({ error: "Failed to register user." });
+      }
+
+      // 3. Create profiles in Supabase
+      if (role === "clipper") {
+        const { error: profileErr } = await supabase
+          .from("clipper_profiles")
+          .insert([{
+            user_id: userId,
+            upi_id: "",
+            instagram_handle: "",
+            youtube_handle: "",
+            kyc_status: "Pending",
+            kyc_doc_url: "",
+            kyc_aadhaar: "",
+            kyc_pan: ""
+          }]);
+        if (profileErr) {
+          console.warn("Supabase signup profile creation error:", profileErr);
+        }
+      } else if (role === "creator") {
+        const { error: profileErr } = await supabase
+          .from("creator_profiles")
+          .insert([{
+            user_id: userId,
+            channel_url: "",
+            wallet_balance: 0
+          }]);
+        if (profileErr) {
+          console.warn("Supabase signup profile creation error:", profileErr);
+        }
+      }
+
+      res.status(201).json({
+        id: userId,
+        name,
+        email,
+        role,
+      });
+    } catch (err: any) {
+      console.error("Signup catch error:", err);
+      res.status(500).json({ error: err.message || "Internal server error." });
     }
-
-    saveDb(db);
-    res.status(201).json({
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-    });
   });
 
-  app.post("/api/auth/login", (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "Please enter email and password." });
-    }
-    const db = loadDb();
-    const user = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    
-    // Auto-bootstrap any aarav63raut@gmail.com login as Admin
-    if (user && email.toLowerCase() === "aarav63raut@gmail.com" && user.role !== "admin") {
-      user.role = "admin";
-      saveDb(db);
-    }
-
-    const isPasswordValid = user && bcrypt.compareSync(password, user.password);
-    if (!user || !isPasswordValid) {
-      return res.status(401).json({ error: "Invalid email or password." });
-    }
-
-    // Check suspension/ban status
-    if (user.status === "banned") {
-      return res.status(403).json({ error: `This account has been PERMANENTLY BANNED. Reason: ${user.statusReason || "Policy violation"}` });
-    }
-    if (user.status === "suspended" && user.statusUntil) {
-      const untilDate = new Date(user.statusUntil);
-      if (untilDate > new Date()) {
-        return res.status(403).json({ error: `This account is SUSPENDED until ${untilDate.toLocaleString("en-IN")}. Reason: ${user.statusReason || "Temporary cool-off"}` });
-      } else {
-        // Lift suspension
-        user.status = "active";
-        user.statusUntil = null;
-        user.statusReason = "";
-        saveDb(db);
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Please enter email and password." });
       }
+
+      // 1. Query Supabase users table
+      const { data: user, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email.toLowerCase())
+        .maybeSingle();
+
+      if (error) {
+        console.error("Supabase login error:", error);
+        return res.status(500).json({ error: "Authentication service unavailable." });
+      }
+
+      // Auto-bootstrap any aarav63raut@gmail.com login as Admin in Supabase
+      if (user && email.toLowerCase() === "aarav63raut@gmail.com" && user.role !== "admin") {
+        user.role = "admin";
+        await supabase
+          .from("users")
+          .update({ role: "admin" })
+          .eq("id", user.id);
+      }
+
+      const isPasswordValid = user && bcrypt.compareSync(password, user.password);
+      if (!user || !isPasswordValid) {
+        return res.status(401).json({ error: "Invalid email or password." });
+      }
+
+      const userStatus = user.status;
+      const statusUntil = user.status_until || user.statusUntil;
+      const statusReason = user.status_reason || user.statusReason;
+
+      // Check suspension/ban status
+      if (userStatus === "banned") {
+        return res.status(403).json({ error: `This account has been PERMANENTLY BANNED. Reason: ${statusReason || "Policy violation"}` });
+      }
+      if (userStatus === "suspended" && statusUntil) {
+        const untilDate = new Date(statusUntil);
+        if (untilDate > new Date()) {
+          return res.status(403).json({ error: `This account is SUSPENDED until ${untilDate.toLocaleString("en-IN")}. Reason: ${statusReason || "Temporary cool-off"}` });
+        } else {
+          // Lift suspension in Supabase
+          await supabase
+            .from("users")
+            .update({ status: "active", status_until: null, status_reason: "" })
+            .eq("id", user.id);
+          user.status = "active";
+          user.status_until = null;
+          user.status_reason = "";
+        }
+      }
+
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      });
+    } catch (err: any) {
+      console.error("Login catch error:", err);
+      res.status(500).json({ error: err.message || "Internal server error." });
     }
-    
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
   });
 
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
