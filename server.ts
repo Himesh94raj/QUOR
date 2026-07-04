@@ -8,9 +8,16 @@ import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, W
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
 
-const supabaseUrl = process.env.SUPABASE_URL || "https://lypahygyocdjplmwluus.supabase.co";
-// Use the secret SUPABASE_SERVICE_ROLE_KEY on the server to bypass RLS, falling back to the standard key
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || "sb_publishable_oTS9yxjoBByQ9gtBcHEAYQ_dEUP2gEh";
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl) {
+  throw new Error("Missing SUPABASE_URL environment variable.");
+}
+if (!supabaseKey) {
+  throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Async helper to sync to Supabase
