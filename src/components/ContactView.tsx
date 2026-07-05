@@ -52,7 +52,7 @@ export const ContactView: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium text-gray-400">Email Address</p>
-                <p className="text-white mt-0.5">supportquor@gmail.com</p>
+                <p className="text-white mt-0.5">quorsupport@gmail.com</p>
               </div>
             </div>
 
@@ -62,7 +62,7 @@ export const ContactView: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium text-gray-400">Hotline Number</p>
-                <p className="text-white mt-0.5">+91 98765 43210</p>
+                <p className="text-white mt-0.5">+91 9142375006</p>
               </div>
             </div>
 
@@ -72,7 +72,7 @@ export const ContactView: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium text-gray-400">Headquarters Address</p>
-                <p className="text-white mt-0.5">Sector 5, HSR Layout, Bengaluru, Karnataka 560102</p>
+                <p className="text-white mt-0.5">A Block Sector-63, Noida</p>
               </div>
             </div>
           </div>
