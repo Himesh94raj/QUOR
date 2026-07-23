@@ -37,7 +37,7 @@ export interface CreatorProfile {
   walletBalance: number;
 }
 
-export type CampaignStatus = "Draft" | "Active" | "Paused" | "Completed";
+export type CampaignStatus = "Draft" | "Funded" | "Active" | "Paused" | "Completed" | "Cancelled";
 export type CampaignPlatform = "instagram" | "youtube" | "both" | "facebook" | "twitter";
 
 export interface Campaign {
@@ -60,7 +60,7 @@ export interface Campaign {
   campaignType?: "ugc" | "clipping" | "both";
 }
 
-export type SubmissionStatus = "Pending" | "Approved" | "Rejected";
+export type SubmissionStatus = "Submitted" | "UnderReview" | "Approved" | "Rejected" | "Suspended" | "Pending";
 
 export interface Submission {
   id: string;
@@ -74,6 +74,7 @@ export interface Submission {
   approvedAt: string | null;
   views: number;
   lastFetchedViews: string | null;
+  createdAt: string;
 }
 
 export type WalletTxType = "deposit" | "payment" | "withdrawal" | "commission";
@@ -157,6 +158,38 @@ export interface DbSchema {
   financialLedger?: FinancialLedgerEntry[];
   clipperBalances?: Record<string, ClipperBalance>;
   viewPayoutEvents?: ViewPayoutEvent[];
+  auditEvents?: AuditEvent[];
+  fraudEvents?: FraudEvent[];
+}
+
+export interface AuditEvent {
+  id: string;
+  actorUserId?: string;
+  actorRole?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  metadata?: Record<string, any>;
+  ipHash?: string;
+  userAgentHash?: string;
+  createdAt: string;
+}
+
+export interface FraudEvent {
+  id: string;
+  submissionId: string;
+  campaignId: string;
+  clipperId: string;
+  riskScore: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  flags: string[];
+  action: "allow" | "review" | "suspend";
+  resolved: boolean;
+  resolvedAt?: string;
+  resolvedAction?: string; // "clear", "approve", "reject", "restore", "suspend"
+  resolvedBy?: string;
+  resolvedNotes?: string;
+  createdAt: string;
 }
 
 export interface ContactMessage {

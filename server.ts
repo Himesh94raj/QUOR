@@ -8,7 +8,25 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent } from "./src/types.js";
+import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent, AuditEvent, FraudEvent } from "./src/types.js";
+import {
+  detectPlatform,
+  normalizeSocialUrl,
+  extractContentId,
+  validateSubmissionUrl
+} from "./src/services/socialUrlService.js";
+import {
+  analyzeViewUpdate,
+  analyzeSubmissionCreation
+} from "./src/services/fraudDetectionService.js";
+import {
+  getProviderForPlatform
+} from "./src/services/viewVerificationService.js";
+import {
+  recordAuditEvent,
+  validateCampaignTransition,
+  validateSubmissionTransition
+} from "./src/services/stateMachineService.js";
 
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
@@ -839,7 +857,8 @@ const loadDb = (): DbSchema => {
           feedback: "Great edits on this clip! Subtitles are extremely visible.",
           approvedAt: new Date().toISOString(),
           views: 12000,
-          lastFetchedViews: new Date().toISOString()
+          lastFetchedViews: new Date().toISOString(),
+          createdAt: new Date().toISOString()
         },
         {
           id: "sub-2",
@@ -851,7 +870,8 @@ const loadDb = (): DbSchema => {
           status: "Pending",
           views: 0,
           lastFetchedViews: null,
-          approvedAt: null
+          approvedAt: null,
+          createdAt: new Date().toISOString()
         }
       ],
       walletHistory: [
@@ -1205,6 +1225,7 @@ const startServer = async () => {
         };
       }
 
+      recordAuditEvent(db, userId, role, "SIGNUP", "user", userId, { email, name });
       saveDb(db);
 
       const isOwnerAdmin = false;
@@ -1267,6 +1288,9 @@ const startServer = async () => {
 
       const isPasswordValid = user && bcrypt.compareSync(password, user.password);
       if (!user || !isPasswordValid) {
+        const localDb = loadDb();
+        recordAuditEvent(localDb, undefined, undefined, "LOGIN_FAILURE", "user", undefined, { email });
+        saveDb(localDb);
         return res.status(401).json({ error: "Invalid email or password." });
       }
 
@@ -1276,11 +1300,17 @@ const startServer = async () => {
 
       // Check suspension/ban status
       if (userStatus === "banned") {
+        const localDb = loadDb();
+        recordAuditEvent(localDb, user.id, user.role, "LOGIN_FAILURE", "user", user.id, { email, reason: "banned" });
+        saveDb(localDb);
         return res.status(403).json({ error: `This account has been PERMANENTLY BANNED. Reason: ${statusReason || "Policy violation"}` });
       }
       if (userStatus === "suspended" && statusUntil) {
         const untilDate = new Date(statusUntil);
         if (untilDate > new Date()) {
+          const localDb = loadDb();
+          recordAuditEvent(localDb, user.id, user.role, "LOGIN_FAILURE", "user", user.id, { email, reason: "suspended" });
+          saveDb(localDb);
           return res.status(403).json({ error: `This account is SUSPENDED until ${untilDate.toLocaleString("en-IN")}. Reason: ${statusReason || "Temporary cool-off"}` });
         } else {
           // Lift suspension in Supabase
@@ -1307,6 +1337,10 @@ const startServer = async () => {
           expiresIn: "7d"
         }
       );
+
+      const successDb = loadDb();
+      recordAuditEvent(successDb, user.id, user.role, "LOGIN_SUCCESS", "user", user.id, { email });
+      saveDb(successDb);
 
       res.json({
         id: user.id,
@@ -1561,6 +1595,10 @@ const startServer = async () => {
     };
     db.walletHistory.push(transaction);
 
+    // Write audit events for creation and funding
+    recordAuditEvent(db, req.user.id, req.user.role, "CAMPAIGN_CREATION", "campaign", campaignId, { title, budget });
+    recordAuditEvent(db, req.user.id, req.user.role, "CAMPAIGN_FUNDING", "campaign", campaignId, { amount: Number(budget) });
+
     saveDb(db);
     res.status(201).json({ message: "Campaign launched successfully!", campaign: newCampaign });
   });
@@ -1580,9 +1618,24 @@ const startServer = async () => {
     }
 
     if (status) {
+      const transitionResult = validateCampaignTransition(db, campaign, status, req.user.id, req.user.role);
+      if (!transitionResult.allowed) {
+        return res.status(400).json({ error: transitionResult.error });
+      }
+
+      const oldStatus = campaign.status;
       campaign.status = status;
-      if (status === "Completed") {
+
+      recordAuditEvent(db, req.user.id, req.user.role, "CAMPAIGN_STATUS_CHANGE", "campaign", campaign.id, {
+        oldStatus,
+        newStatus: status
+      });
+
+      if (status === "Completed" || status === "Cancelled") {
         refundCampaignEscrow(db, campaign);
+        recordAuditEvent(db, req.user.id, req.user.role, "CAMPAIGN_ESCROW_REFUND", "campaign", campaign.id, {
+          amount: campaign.escrowBalance || 0
+        });
       }
     }
     if (title) campaign.title = title;
@@ -1605,8 +1658,20 @@ const startServer = async () => {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
+    // Check financial ledger activity
+    const hasFinancialActivity = db.financialLedger && db.financialLedger.some(
+      e => e.campaignId === id && e.referenceType !== "escrow_lock"
+    );
+    if (hasFinancialActivity) {
+      return res.status(400).json({ error: "Campaign cannot be deleted once it has financial ledger activity. You may cancel it instead." });
+    }
+
     // Refund unused escrow balance traceably and securely using the new ledger
     refundCampaignEscrow(db, campaign);
+
+    recordAuditEvent(db, req.user.id, req.user.role, "CAMPAIGN_DELETION", "campaign", campaign.id, {
+      title: campaign.title
+    });
 
     db.campaigns.splice(index, 1);
     saveDb(db);
@@ -1656,26 +1721,83 @@ const startServer = async () => {
       return res.status(400).json({ error: "This campaign is no longer active for submissions." });
     }
 
+    // Social URL Validation & Platform Detection
+    const urlValidation = validateSubmissionUrl(submittedUrl);
+    if (!urlValidation.isValid) {
+      return res.status(400).json({ error: urlValidation.error });
+    }
+    const normalizedUrl = urlValidation.normalizedUrl!;
+    const contentId = urlValidation.contentId!;
+
+    // Prevent duplicate submission of the same social content in the same campaign
+    const duplicateContent = db.submissions.find(s => {
+      if (s.campaignId !== campaignId) return false;
+      const existingId = extractContentId(s.submittedUrl);
+      return existingId === contentId;
+    });
+    if (duplicateContent) {
+      return res.status(400).json({ error: "Duplicate Submission: This social media video content has already been submitted to this campaign." });
+    }
+
     // Limit to one active submission per clipper per campaign
-    const existingActive = db.submissions.find(s => s.campaignId === campaignId && s.clipperId === req.user.id);
+    const existingActive = db.submissions.find(s => s.campaignId === campaignId && s.clipperId === req.user.id && s.status !== "Rejected" && s.status !== "Suspended");
     if (existingActive) {
       return res.status(400).json({ error: "You already have an active submission for this campaign." });
     }
 
+    // Fraud check on creation
+    const fraudResult = analyzeSubmissionCreation(db, req.user.id, normalizedUrl, campaignId);
+    if (fraudResult.action === "suspend") {
+      return res.status(400).json({ error: `Submission blocked by fraud engine: ${fraudResult.flags.join(", ")}` });
+    }
+
+    const subId = "sub-" + Math.random().toString(36).substring(2, 9);
     const newSub: Submission = {
-      id: "sub-" + Math.random().toString(36).substring(2, 9),
+      id: subId,
       campaignId,
       campaignTitle: campaign.title,
       clipperId: req.user.id,
       clipperName: req.user.name,
-      submittedUrl,
-      status: "Pending",
+      submittedUrl: normalizedUrl,
+      status: "Submitted",
       views: 0,
       lastFetchedViews: null,
-      approvedAt: null
+      approvedAt: null,
+      createdAt: new Date().toISOString()
     };
 
     db.submissions.push(newSub);
+
+    // If medium or high risk, record in fraudEvents queue
+    if (fraudResult.riskScore >= 30) {
+      if (!db.fraudEvents) {
+        db.fraudEvents = [];
+      }
+      db.fraudEvents.push({
+        id: "fraud-" + Math.random().toString(36).substring(2, 9),
+        submissionId: subId,
+        campaignId,
+        clipperId: req.user.id,
+        riskScore: fraudResult.riskScore,
+        riskLevel: fraudResult.riskLevel,
+        flags: fraudResult.flags,
+        action: fraudResult.action,
+        resolved: false,
+        createdAt: new Date().toISOString()
+      });
+      recordAuditEvent(db, req.user.id, req.user.role, "FRAUD_FLAG_RAISED", "submission", subId, {
+        riskScore: fraudResult.riskScore,
+        flags: fraudResult.flags
+      });
+    }
+
+    // Audit Event
+    recordAuditEvent(db, req.user.id, req.user.role, "SUBMISSION_CREATION", "submission", subId, {
+      campaignId,
+      submittedUrl: normalizedUrl,
+      contentId
+    });
+
     saveDb(db);
 
     res.status(201).json({ message: "Clip submitted successfully! Waiting for creator approval.", submission: newSub });
@@ -1683,9 +1805,9 @@ const startServer = async () => {
 
   app.post("/api/submissions/:id/review", authenticateUser, (req: any, res) => {
     const { id } = req.params;
-    const { status, feedback } = req.body; // Approved / Rejected
+    const { status, feedback } = req.body; // Approved / Rejected / UnderReview / Suspended
 
-    if (!status || (status !== "Approved" && status !== "Rejected")) {
+    if (!status || (status !== "Approved" && status !== "Rejected" && status !== "UnderReview" && status !== "Suspended" && status !== "Submitted")) {
       return res.status(400).json({ error: "Invalid status selection." });
     }
 
@@ -1700,21 +1822,32 @@ const startServer = async () => {
       return res.status(404).json({ error: "Campaign not found." });
     }
 
-    if (req.user.role !== "admin" && campaign.creatorId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized review attempt." });
+    // Validate transition
+    const transition = validateSubmissionTransition(db, submission, status, req.user.id, req.user.role);
+    if (!transition.allowed) {
+      return res.status(400).json({ error: transition.error });
     }
 
+    const oldStatus = submission.status;
     submission.status = status;
     if (feedback) submission.feedback = feedback;
-    if (status === "Approved") {
+
+    if (status === "Approved" && !submission.approvedAt) {
       submission.approvedAt = new Date().toISOString();
       // Start initial mock view views
       submission.views = Math.floor(Math.random() * 50) + 10;
       submission.lastFetchedViews = new Date().toISOString();
     }
 
+    // Audit Event
+    recordAuditEvent(db, req.user.id, req.user.role, "SUBMISSION_REVIEW", "submission", submission.id, {
+      oldStatus,
+      newStatus: status,
+      feedback
+    });
+
     saveDb(db);
-    res.json({ message: `Submission is successfully ${status}!`, submission });
+    res.json({ message: `Submission is successfully updated to ${status}!`, submission });
   });
 
   // Payout / Withdrawal requests
@@ -1945,6 +2078,86 @@ const startServer = async () => {
     res.json({ message: `Payout request marked as ${status}.`, payout });
   });
 
+  app.get("/api/admin/audit-events", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const db = loadDb();
+    let events = db.auditEvents || [];
+
+    const { userId, action, entityType, entityId, limit } = req.query;
+
+    if (userId) {
+      events = events.filter(e => e.actorUserId === userId);
+    }
+    if (action) {
+      events = events.filter(e => e.action === action);
+    }
+    if (entityType) {
+      events = events.filter(e => e.entityType === entityType);
+    }
+    if (entityId) {
+      events = events.filter(e => e.entityId === entityId);
+    }
+
+    // Sort by createdAt desc
+    events = [...events].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const limitNum = limit ? parseInt(limit as string, 10) : 100;
+    res.json(events.slice(0, limitNum));
+  });
+
+  app.get("/api/admin/fraud/queue", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const db = loadDb();
+    const queue = db.fraudEvents || [];
+    res.json(queue);
+  });
+
+  app.post("/api/admin/fraud/:id/resolve", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const { id } = req.params;
+    const { action, notes } = req.body; // "approve" | "dismiss" | "suspend"
+
+    if (!action || (action !== "approve" && action !== "dismiss" && action !== "suspend")) {
+      return res.status(400).json({ error: "Invalid action. Must be 'approve', 'dismiss' or 'suspend'." });
+    }
+
+    const db = loadDb();
+    if (!db.fraudEvents) {
+      db.fraudEvents = [];
+    }
+
+    const event = db.fraudEvents.find(e => e.id === id);
+    if (!event) {
+      return res.status(404).json({ error: "Fraud event not found." });
+    }
+
+    event.resolved = true;
+    event.resolvedAction = action;
+    event.resolvedNotes = notes || "";
+    event.resolvedAt = new Date().toISOString();
+    event.resolvedBy = req.user.id;
+
+    const sub = db.submissions.find(s => s.id === event.submissionId);
+    if (sub) {
+      if (action === "suspend") {
+        sub.status = "Suspended";
+      } else if (action === "approve") {
+        sub.status = "Approved";
+      } else if (action === "dismiss") {
+        if (sub.status === "Suspended") {
+          sub.status = "Approved";
+        }
+      }
+    }
+
+    // Audit Event
+    recordAuditEvent(db, req.user.id, req.user.role, "FRAUD_RESOLUTION", "submission", event.submissionId, {
+      fraudEventId: id,
+      action,
+      notes
+    });
+
+    saveDb(db);
+    res.json({ message: "Fraud event successfully resolved.", event, submission: sub });
+  });
+
   // VIEW TRACKING ENGINE (Manual Trigger or automatic increment)
   function processViewPayout(
     db: DbSchema,
@@ -1959,7 +2172,12 @@ const startServer = async () => {
     }
 
     if (sub.status !== "Approved") {
-      return { success: false, error: "Submission is not approved" };
+      return { success: false, error: `Submission is not approved (Current: ${sub.status})` };
+    }
+
+    // Reject negative view deltas
+    if (addedViews < 0) {
+      return { success: false, error: "Negative view delta rejected" };
     }
 
     // Idempotency check: if a ledger entry with referenceId ending in -${batchId} already exists, it is a duplicate!
@@ -1982,6 +2200,82 @@ const startServer = async () => {
       return { success: false, error: "Campaign escrow budget fully spent" };
     }
 
+    const previousPaidViews = db.viewPayoutEvents ? db.viewPayoutEvents.filter(e => e.submissionId === sub.id).reduce((sum, e) => sum + e.verifiedViews, 0) : 0;
+
+    // Never pay twice for the same verified views / duplicate verification check
+    const isDoublePay = db.viewPayoutEvents && db.viewPayoutEvents.some(
+      e => e.submissionId === sub.id && e.previousViews === previousPaidViews && e.verifiedViews === addedViews && addedViews > 0
+    );
+    if (isDoublePay) {
+      return { success: false, error: "Duplicate verification event detected. Views already paid." };
+    }
+
+    // Run fraud analysis
+    const fraudResult = analyzeViewUpdate(db, subId, addedViews, previousPaidViews);
+
+    if (fraudResult.action === "suspend") {
+      sub.status = "Suspended";
+      if (!db.fraudEvents) db.fraudEvents = [];
+      db.fraudEvents.push({
+        id: "fraud-" + Math.random().toString(36).substring(2, 9),
+        submissionId: sub.id,
+        campaignId: campaign.id,
+        clipperId: sub.clipperId,
+        riskScore: fraudResult.riskScore,
+        riskLevel: fraudResult.riskLevel,
+        flags: fraudResult.flags,
+        action: "suspend",
+        resolved: false,
+        createdAt: new Date().toISOString()
+      });
+      recordAuditEvent(db, undefined, undefined, "FRAUD_CRITICAL_SUSPENDED", "submission", sub.id, {
+        riskScore: fraudResult.riskScore,
+        flags: fraudResult.flags
+      });
+      return { success: false, error: `Critical fraud level: ${fraudResult.flags.join(", ")}. Submission suspended.` };
+    }
+
+    if (fraudResult.riskLevel === "high") {
+      if (!db.fraudEvents) db.fraudEvents = [];
+      db.fraudEvents.push({
+        id: "fraud-" + Math.random().toString(36).substring(2, 9),
+        submissionId: sub.id,
+        campaignId: campaign.id,
+        clipperId: sub.clipperId,
+        riskScore: fraudResult.riskScore,
+        riskLevel: fraudResult.riskLevel,
+        flags: fraudResult.flags,
+        action: "review",
+        resolved: false,
+        createdAt: new Date().toISOString()
+      });
+      recordAuditEvent(db, undefined, undefined, "FRAUD_HIGH_RISK_PAUSED", "submission", sub.id, {
+        riskScore: fraudResult.riskScore,
+        flags: fraudResult.flags
+      });
+      return { success: false, error: "High risk fraud flagged, payout paused for review." };
+    }
+
+    if (fraudResult.riskLevel === "medium") {
+      if (!db.fraudEvents) db.fraudEvents = [];
+      db.fraudEvents.push({
+        id: "fraud-" + Math.random().toString(36).substring(2, 9),
+        submissionId: sub.id,
+        campaignId: campaign.id,
+        clipperId: sub.clipperId,
+        riskScore: fraudResult.riskScore,
+        riskLevel: fraudResult.riskLevel,
+        flags: fraudResult.flags,
+        action: "allow",
+        resolved: false,
+        createdAt: new Date().toISOString()
+      });
+      recordAuditEvent(db, undefined, undefined, "FRAUD_MEDIUM_RISK_FLAGGED", "submission", sub.id, {
+        riskScore: fraudResult.riskScore,
+        flags: fraudResult.flags
+      });
+    }
+
     const creatorCost = (addedViews / 1000) * campaign.cpm;
     const finalCost = Math.min(creatorCost, remainingBudget);
     
@@ -1991,8 +2285,6 @@ const startServer = async () => {
     if (roundedCost <= 0) {
       return { success: false, error: "Payout amount is too small or zero" };
     }
-
-    const previousPaidViews = db.viewPayoutEvents ? db.viewPayoutEvents.filter(e => e.submissionId === sub.id).reduce((sum, e) => sum + e.verifiedViews, 0) : 0;
     
     // Distribute earnings: 80% to Clipper, 20% to Platform
     const clipperShare = Math.round(roundedCost * 0.8 * 100) / 100;
@@ -2068,6 +2360,15 @@ const startServer = async () => {
       status: "Completed",
       description: desc,
       createdAt: new Date().toISOString()
+    });
+
+    // View verification Audit Event
+    recordAuditEvent(db, undefined, undefined, "VIEW_VERIFICATION", "submission", sub.id, {
+      previousViews: previousPaidViews,
+      addedViews: finalAddedViews,
+      newViews: sub.views,
+      grossAmount: roundedCost,
+      riskLevel: fraudResult.riskLevel
     });
 
     return { success: true, grossAmount: roundedCost };

@@ -9,8 +9,8 @@ function createMockDb(): DbSchema {
       { id: "clipper-2", name: "Rohan Clipper", email: "rohan@clips.in", password: "pwd", role: "clipper", createdAt: "" }
     ],
     clipperProfiles: {
-      "clipper-1": { userId: "clipper-1", channelUrl: "", kycStatus: "Verified", upiId: "samir@upi" },
-      "clipper-2": { userId: "clipper-2", channelUrl: "", kycStatus: "Verified", upiId: "rohan@upi" }
+      "clipper-1": { userId: "clipper-1", instagramHandle: "", youtubeHandle: "", kycDocUrl: "", kycAadhaar: "", kycPan: "", kycStatus: "Verified", upiId: "samir@upi" },
+      "clipper-2": { userId: "clipper-2", instagramHandle: "", youtubeHandle: "", kycDocUrl: "", kycAadhaar: "", kycPan: "", kycStatus: "Verified", upiId: "rohan@upi" }
     },
     creatorProfiles: {
       "creator-1": { userId: "creator-1", channelUrl: "", walletBalance: 0 }
@@ -312,7 +312,7 @@ async function runTests() {
     spent: 0,
     escrowBalance: budget,
     instructions: "Clip nicely",
-    platform: "YouTube",
+    platform: "youtube",
     minDuration: 30,
     deadline: "2026-12-31",
     status: "Active",
@@ -348,9 +348,10 @@ async function runTests() {
   const newSub: Submission = {
     id: subId,
     campaignId,
+    campaignTitle: "Awesome Clip",
     clipperId,
     clipperName: "Samir Clipper",
-    videoUrl: "https://tiktok.com/samir_clip",
+    submittedUrl: "https://tiktok.com/samir_clip",
     views: 0,
     status: "Approved",
     createdAt: new Date().toISOString(),
@@ -399,9 +400,10 @@ async function runTests() {
   const newSub2: Submission = {
     id: subId2,
     campaignId,
+    campaignTitle: "Awesome Clip",
     clipperId: clipperId2,
     clipperName: "Rohan Clipper",
-    videoUrl: "https://tiktok.com/rohan_clip",
+    submittedUrl: "https://tiktok.com/rohan_clip",
     views: 0,
     status: "Approved",
     createdAt: new Date().toISOString(),
@@ -457,7 +459,7 @@ async function runTests() {
     spent: 3000,
     escrowBalance: 2000, // 2000 unused remaining
     instructions: "Clip",
-    platform: "YouTube",
+    platform: "youtube",
     minDuration: 30,
     deadline: "2026-12-31",
     status: "Active",
