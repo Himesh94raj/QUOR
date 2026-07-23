@@ -1,3 +1,6 @@
+import Razorpay from "razorpay";
+import crypto from "crypto";
+
 export interface PaymentOrder {
   id: string;
   amount: number; // in paise
@@ -70,17 +73,20 @@ export class MockPaymentProvider implements PaymentProvider {
 export class RazorpayPaymentProvider implements PaymentProvider {
   private keyId: string;
   private keySecret: string;
+  private webhookSecret: string;
 
   constructor() {
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    if (!keyId || !keySecret) {
-      throw new Error("Missing Razorpay credentials: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required when using the razorpay payment provider.");
+    if (!keyId || !keySecret || !webhookSecret) {
+      throw new Error("Missing Razorpay credentials: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET are required when using the razorpay payment provider.");
     }
 
     this.keyId = keyId;
     this.keySecret = keySecret;
+    this.webhookSecret = webhookSecret;
   }
 
   async createOrder(input: {
@@ -88,16 +94,29 @@ export class RazorpayPaymentProvider implements PaymentProvider {
     amountPaise: number;
     currency: string;
   }): Promise<PaymentOrder> {
-    // In future, we would import razorpay SDK or do a direct fetch:
-    // const instance = new Razorpay({ key_id: this.keyId, key_secret: this.keySecret });
-    // const order = await instance.orders.create({ ... })
-    // For now, we simulate API-like structure to show gateway readiness
-    return {
-      id: `order_rzp_${Math.random().toString(36).substring(2, 9)}`,
+    if (!input.amountPaise || typeof input.amountPaise !== "number" || input.amountPaise <= 0 || !Number.isInteger(input.amountPaise)) {
+      throw new Error("Invalid payment amount: amountPaise must be a positive integer representing paise.");
+    }
+
+    const instance = new Razorpay({
+      key_id: this.keyId,
+      key_secret: this.keySecret
+    });
+
+    const receipt = `receipt_user_${input.userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    const order = await instance.orders.create({
       amount: input.amountPaise,
       currency: input.currency,
-      status: "created",
-      receipt: `receipt_user_${input.userId}`
+      receipt: receipt
+    });
+
+    return {
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      status: order.status,
+      receipt: order.receipt
     };
   }
 
@@ -106,16 +125,54 @@ export class RazorpayPaymentProvider implements PaymentProvider {
     paymentId: string;
     signature: string;
   }): Promise<PaymentVerificationResult> {
-    // In future, verify using crypto:
-    // const hmac = crypto.createHmac("sha256", this.keySecret);
-    // hmac.update(input.orderId + "|" + input.paymentId);
-    // const generatedSignature = hmac.digest("hex");
-    // const success = generatedSignature === input.signature;
-    return {
-      success: true,
-      orderId: input.orderId,
-      paymentId: input.paymentId
-    };
+    if (!input.orderId || !input.paymentId || !input.signature) {
+      return {
+        success: false,
+        orderId: input.orderId,
+        error: "Missing parameters for payment verification"
+      };
+    }
+
+    try {
+      const generatedSignature = crypto
+        .createHmac("sha256", this.keySecret)
+        .update(input.orderId + "|" + input.paymentId)
+        .digest("hex");
+
+      let isValid = false;
+      try {
+        if (typeof input.signature === "string" && generatedSignature.length === input.signature.length) {
+          isValid = crypto.timingSafeEqual(
+            Buffer.from(generatedSignature, "utf-8"),
+            Buffer.from(input.signature, "utf-8")
+          );
+        }
+      } catch (e) {
+        isValid = false;
+      }
+
+      if (!isValid) {
+        if (generatedSignature !== input.signature) {
+          return {
+            success: false,
+            orderId: input.orderId,
+            error: "Invalid Razorpay payment signature"
+          };
+        }
+      }
+
+      return {
+        success: true,
+        orderId: input.orderId,
+        paymentId: input.paymentId
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        orderId: input.orderId,
+        error: `Signature verification failed: ${err.message}`
+      };
+    }
   }
 }
 
@@ -123,6 +180,9 @@ export function getPaymentProvider(): PaymentProvider {
   const providerType = (process.env.PAYMENT_PROVIDER || "mock").toLowerCase();
   if (providerType === "razorpay") {
     return new RazorpayPaymentProvider();
+  } else if (providerType === "mock") {
+    return new MockPaymentProvider();
+  } else {
+    throw new Error(`Unsupported payment provider: ${process.env.PAYMENT_PROVIDER}. Allowed providers are 'mock' or 'razorpay'.`);
   }
-  return new MockPaymentProvider();
 }

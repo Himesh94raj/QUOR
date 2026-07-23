@@ -29,6 +29,14 @@ import {
 } from "./src/services/stateMachineService.js";
 import { getPaymentProvider } from "./src/services/paymentProvider.js";
 import { getKycProvider } from "./src/services/kycProvider.js";
+import { dbProvider } from "./src/services/db.js";
+import { userRepository } from "./src/services/userRepository.js";
+import { campaignRepository } from "./src/services/campaignRepository.js";
+import { submissionRepository } from "./src/services/submissionRepository.js";
+import { paymentRepository } from "./src/services/paymentRepository.js";
+import { ledgerRepository } from "./src/services/ledgerRepository.js";
+import { payoutRepository } from "./src/services/payoutRepository.js";
+import { auditRepository } from "./src/services/auditRepository.js";
 
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
@@ -1608,31 +1616,55 @@ const startServer = async () => {
   });
 
   app.post("/api/payments/verify", authenticateUser, async (req: any, res) => {
-    const { orderId, paymentId, signature } = req.body;
+    const { orderId, paymentId, signature, amountPaise, currency } = req.body;
 
     if (!orderId || !paymentId || !signature) {
       return res.status(400).json({ error: "Missing required parameters: orderId, paymentId, and signature are required." });
     }
 
-    const db = loadDb();
-    if (!db.payments) db.payments = [];
-
-    const paymentRecord = db.payments.find(p => p.provider_order_id === orderId);
-    if (!paymentRecord) {
-      return res.status(404).json({ error: "Payment record not found for the specified orderId." });
-    }
-
-    if (paymentRecord.user_id !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
-    }
-
-    if (paymentRecord.status === "paid") {
-      return res.status(400).json({ error: "Duplicate verification rejected: This payment has already been verified and credited." });
-    }
-
-    paymentRecord.verification_attempts += 1;
-
     try {
+      const paymentRecord = await paymentRepository.findByOrderId(orderId);
+      if (!paymentRecord) {
+        return res.status(404).json({ error: "Payment record not found for the specified orderId." });
+      }
+
+      if (paymentRecord.user_id !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
+      }
+
+      if (paymentRecord.status === "paid") {
+        return res.status(400).json({ error: "Duplicate verification rejected: This payment has already been verified and credited." });
+      }
+
+      // Prevent amount mismatch
+      if (amountPaise !== undefined && amountPaise !== paymentRecord.amount_paise) {
+        return res.status(400).json({ error: "Amount mismatch: Verified payment amount does not match the order." });
+      }
+
+      // Prevent currency mismatch
+      if (currency !== undefined && currency !== paymentRecord.currency) {
+        return res.status(400).json({ error: "Currency mismatch: Verified payment currency does not match the order." });
+      }
+
+      // Prevent payment ID reuse
+      let isPaymentIdReused = false;
+      if (dbProvider === "supabase") {
+        const { data, error } = await supabase.from("payments").select("id").eq("provider_payment_id", paymentId).eq("status", "paid").maybeSingle();
+        if (!error && data) {
+          isPaymentIdReused = true;
+        }
+      } else {
+        const db = loadDb();
+        if (db.payments) {
+          isPaymentIdReused = db.payments.some(p => p.provider_payment_id === paymentId && p.status === "paid");
+        }
+      }
+
+      if (isPaymentIdReused) {
+        return res.status(400).json({ error: "Payment ID has already been used and verified." });
+      }
+
+      // Verification
       const provider = getPaymentProvider();
       const result = await provider.verifyPayment({
         orderId,
@@ -1642,7 +1674,8 @@ const startServer = async () => {
 
       if (!result.success) {
         paymentRecord.status = "failed";
-        saveDb(db);
+        paymentRecord.verification_attempts += 1;
+        await paymentRepository.updatePayment(paymentRecord);
         return res.status(400).json({
           success: false,
           error: result.error || "Payment verification failed",
@@ -1651,62 +1684,60 @@ const startServer = async () => {
         });
       }
 
-      paymentRecord.status = "paid";
-      paymentRecord.provider_payment_id = paymentId;
-      paymentRecord.paid_at = new Date().toISOString();
-
-      // Credit creator profile wallet balance
-      let profile = db.creatorProfiles[req.user.id];
-      if (!profile) {
-        profile = { userId: req.user.id, channelUrl: "", walletBalance: 0 };
-        db.creatorProfiles[req.user.id] = profile;
-      }
-
-      const amountINR = paymentRecord.amount_paise / 100;
-      profile.walletBalance = Math.round((profile.walletBalance + amountINR) * 100) / 100;
-
-      // Double-entry financial ledger
+      // Process ledger deposit atomically
       const refId = `payment-verify-${paymentId}`;
-      const ledgerEntry = recordLedgerEntry(db, {
-        referenceId: refId,
-        referenceType: "deposit",
-        fromAccount: `External (${paymentRecord.provider})`,
-        toAccount: `creator_wallet:${req.user.id}`,
-        userId: req.user.id,
-        amount: amountINR,
-        status: "completed",
-        description: `Deposit via Payment Gateway (Order ID: ${orderId}, Payment ID: ${paymentId})`
-      });
+      const ledgerId = `led-${paymentId}`;
+      const txId = `tx-${paymentId}`;
+      const auditId = `aud-${paymentId}`;
 
-      // Wallet transaction history
-      const transaction: WalletTransaction = {
-        id: "tx-" + paymentId,
+      const depositResult = await paymentRepository.depositCreatorFundsRpc({
         userId: req.user.id,
-        type: "deposit",
-        amount: amountINR,
-        status: "Completed",
-        description: `Funded via ${paymentRecord.provider} Payment Gateway`,
-        createdAt: ledgerEntry.createdAt
-      };
-      db.walletHistory.push(transaction);
-
-      // Audit event
-      recordAuditEvent(db, req.user.id, req.user.role, "PAYMENT_DEPOSIT_SUCCESS", "payment", paymentRecord.id, {
-        amountPaise: paymentRecord.amount_paise,
-        amountINR,
         orderId,
         paymentId,
-        provider: paymentRecord.provider
+        amountPaise: paymentRecord.amount_paise,
+        provider: paymentRecord.provider,
+        currency: paymentRecord.currency || "INR",
+        refId,
+        ledgerId,
+        txId,
+        auditId
       });
 
-      saveDb(db);
+      if (!depositResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: depositResult.error || "Atomic ledger funding operation failed."
+        });
+      }
+
+      // Fetch updated balance and transaction history for compatibility
+      let walletBalance = 0;
+      let transaction: any = null;
+
+      if (dbProvider === "supabase") {
+        const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", req.user.id).maybeSingle();
+        if (profileData) {
+          walletBalance = Number(profileData.wallet_balance) / 100;
+        }
+        const { data: txData } = await supabase.from("wallet_history").select("*").eq("id", txId).maybeSingle();
+        if (txData) {
+          transaction = txData;
+        }
+      } else {
+        const db = loadDb();
+        const profile = db.creatorProfiles[req.user.id];
+        walletBalance = profile ? profile.walletBalance : 0;
+        transaction = db.walletHistory.find(tx => tx.id === txId);
+      }
+
+      const updatedRecord = await paymentRepository.findByOrderId(orderId);
 
       res.json({
         success: true,
         provider: paymentRecord.provider,
         testMode: paymentRecord.provider === "mock",
-        payment: paymentRecord,
-        balance: profile.walletBalance,
+        payment: updatedRecord,
+        balance: walletBalance,
         transaction
       });
     } catch (err: any) {
@@ -2809,6 +2840,244 @@ const startServer = async () => {
     const db = loadDb();
     const pending = db.payoutRequests.filter(p => p.status === "Processing");
     res.json(pending);
+  });
+
+  // Verification and System Reconciliation Endpoint
+  app.get("/api/admin/system/reconciliation", authenticateUser, requireOwnerAdmin, async (req: any, res) => {
+    try {
+      const db = loadDb();
+      
+      // 1. Users verification
+      let localUsersCount = db.users ? db.users.length : 0;
+      let dbUsersCount = localUsersCount;
+      let isSupabaseActive = (dbProvider === "supabase");
+      let orphansCount = 0;
+
+      if (isSupabaseActive) {
+        const { count, error } = await supabase.from("users").select("*", { count: "exact", head: true });
+        if (!error && count !== null) {
+          dbUsersCount = count;
+        }
+
+        // Check for clipper profiles without parent user
+        const { data: clippers, error: clError } = await supabase.from("clipper_profiles").select("user_id");
+        const { data: creators, error: crError } = await supabase.from("creator_profiles").select("user_id");
+        const { data: allUserIds, error: uError } = await supabase.from("users").select("id");
+
+        if (!clError && !crError && !uError && clippers && creators && allUserIds) {
+          const userIds = new Set(allUserIds.map((u: any) => u.id));
+          for (const cl of clippers) {
+            if (!userIds.has(cl.user_id)) orphansCount++;
+          }
+          for (const cr of creators) {
+            if (!userIds.has(cr.user_id)) orphansCount++;
+          }
+        }
+      } else {
+        // Local JSON orphan checks
+        const userIds = new Set(db.users.map(u => u.id));
+        if (db.clipperProfiles) {
+          for (const uid of Object.keys(db.clipperProfiles)) {
+            if (!userIds.has(uid)) orphansCount++;
+          }
+        }
+        if (db.creatorProfiles) {
+          for (const uid of Object.keys(db.creatorProfiles)) {
+            if (!userIds.has(uid)) orphansCount++;
+          }
+        }
+      }
+
+      // 2. Ledger sum verification (credits vs debits via assets vs liabilities check)
+      let ledgerEntries: any[] = [];
+      if (isSupabaseActive) {
+        const { data, error } = await supabase.from("financial_ledger").select("*");
+        if (!error && data) {
+          ledgerEntries = data.map(e => ({
+            referenceType: e.reference_type,
+            status: e.status,
+            amount: Number(e.amount) / 100,
+            fromAccount: e.from_account,
+            toAccount: e.to_account,
+            userId: e.user_id
+          }));
+        }
+      } else {
+        ledgerEntries = db.financialLedger || [];
+      }
+
+      const totalDeposits = ledgerEntries
+        .filter(e => e.referenceType === "deposit" && e.status === "completed")
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const totalWithdrawalsCompleted = ledgerEntries
+        .filter(e => e.referenceType === "withdrawal_completed" && e.status === "completed")
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const totalPlatformFees = ledgerEntries
+        .filter(e => e.referenceType === "platform_fee" && e.status === "completed")
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const totalPendingWithdrawals = ledgerEntries
+        .filter(e => e.referenceType === "withdrawal_request" && e.status === "pending")
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      // Reconstruct wallets from profile/current state
+      let creatorWallets = 0;
+      let campaignEscrows = 0;
+      let clipperBalancesSum = 0;
+
+      if (isSupabaseActive) {
+        const { data: crData } = await supabase.from("creator_profiles").select("wallet_balance");
+        if (crData) creatorWallets = crData.reduce((sum, p) => sum + (Number(p.wallet_balance) / 100), 0);
+
+        const { data: campData } = await supabase.from("campaigns").select("escrow_balance");
+        if (campData) campaignEscrows = campData.reduce((sum, c) => sum + (Number(c.escrow_balance) / 100), 0);
+
+        const { data: usersData } = await supabase.from("users").select("id").eq("role", "clipper");
+        if (usersData) {
+          for (const u of usersData) {
+            const bal = await ledgerRepository.getDerivedClipperBalance(u.id);
+            clipperBalancesSum += bal.availableBalance;
+          }
+        }
+      } else {
+        creatorWallets = Object.values(db.creatorProfiles).reduce((sum, p) => sum + (p.walletBalance || 0), 0);
+        campaignEscrows = db.campaigns.reduce((sum, c) => sum + (c.escrowBalance || 0), 0);
+        const clipperUserIds = db.users.filter(u => u.role === "clipper").map(u => u.id);
+        for (const cid of clipperUserIds) {
+          const bal = getDerivedClipperBalance(db, cid);
+          clipperBalancesSum += bal.availableBalance;
+        }
+      }
+
+      const netAssets = totalDeposits - totalWithdrawalsCompleted;
+      const netLiabilitiesAndEquity = creatorWallets + campaignEscrows + clipperBalancesSum + totalPlatformFees + totalPendingWithdrawals;
+      const ledgerSumDifference = Math.abs(netAssets - netLiabilitiesAndEquity);
+      const ledgerSumBalanced = ledgerSumDifference < 1.0;
+
+      // 3. CPM verification: all active campaigns have cpm > 0
+      let activeCampaigns: any[] = [];
+      if (isSupabaseActive) {
+        const { data } = await supabase.from("campaigns").select("*").eq("status", "Active");
+        activeCampaigns = data || [];
+      } else {
+        activeCampaigns = db.campaigns.filter(c => c.status === "Active");
+      }
+      const invalidCpmCampaigns = activeCampaigns.filter(c => {
+        const cpmVal = isSupabaseActive ? Number(c.cpm) / 100 : c.cpm;
+        return cpmVal <= 0;
+      }).map(c => ({ id: c.id, title: c.title, cpm: isSupabaseActive ? Number(c.cpm) / 100 : c.cpm }));
+
+      // 4. Out-of-sync profiles (Creator)
+      const outOfSyncCreators: any[] = [];
+      let creatorsList: any[] = [];
+      if (isSupabaseActive) {
+        const { data } = await supabase.from("creator_profiles").select("*");
+        creatorsList = data || [];
+      } else {
+        creatorsList = Object.values(db.creatorProfiles);
+      }
+
+      for (const cr of creatorsList) {
+        const creatorId = isSupabaseActive ? cr.user_id : cr.userId;
+        const currentBalance = isSupabaseActive ? Number(cr.wallet_balance) / 100 : cr.walletBalance;
+
+        const depositsSum = ledgerEntries
+          .filter(e => e.toAccount === `creator_wallet:${creatorId}` && e.status === "completed")
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        const lockupsSum = ledgerEntries
+          .filter(e => e.fromAccount === `creator_wallet:${creatorId}` && e.status === "completed")
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        const expectedBalance = Math.round((depositsSum - lockupsSum) * 100) / 100;
+        if (Math.abs(currentBalance - expectedBalance) > 0.05) {
+          outOfSyncCreators.push({
+            creatorId,
+            currentBalance,
+            expectedBalance,
+            difference: Math.abs(currentBalance - expectedBalance)
+          });
+        }
+      }
+
+      // 5. Out-of-sync profiles (Clipper)
+      const outOfSyncClippers: any[] = [];
+      let clippersList: any[] = [];
+      if (isSupabaseActive) {
+        const { data } = await supabase.from("users").select("id, name").eq("role", "clipper");
+        clippersList = data || [];
+      } else {
+        clippersList = db.users.filter(u => u.role === "clipper");
+      }
+
+      for (const cl of clippersList) {
+        const clipperId = isSupabaseActive ? cl.id : cl.id;
+        const currentClipperBalance = isSupabaseActive 
+          ? (await ledgerRepository.getDerivedClipperBalance(clipperId)).availableBalance
+          : getDerivedClipperBalance(db, clipperId).availableBalance;
+
+        const earned = ledgerEntries
+          .filter(e => e.toAccount === `clipper_earnings:${clipperId}` && e.status === "completed")
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        const withdrawn = ledgerEntries
+          .filter(e => e.fromAccount === `clipper_pending_withdrawal:${clipperId}` && e.status === "completed")
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        const pending = ledgerEntries
+          .filter(e => e.fromAccount === `clipper_earnings:${clipperId}` && e.status === "pending")
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        const expectedClipperBalance = Math.round((earned - withdrawn - pending) * 100) / 100;
+
+        if (Math.abs(currentClipperBalance - expectedClipperBalance) > 0.05) {
+          outOfSyncClippers.push({
+            clipperId,
+            currentClipperBalance,
+            expectedClipperBalance,
+            difference: Math.abs(currentClipperBalance - expectedClipperBalance)
+          });
+        }
+      }
+
+      res.json({
+        provider: dbProvider,
+        usersVerification: {
+          localUsersCount,
+          dbUsersCount,
+          match: localUsersCount === dbUsersCount || !isSupabaseActive,
+          orphansCount
+        },
+        ledgerSumVerification: {
+          totalDeposits: Math.round(totalDeposits * 100) / 100,
+          totalWithdrawalsCompleted: Math.round(totalWithdrawalsCompleted * 100) / 100,
+          totalPlatformFees: Math.round(totalPlatformFees * 100) / 100,
+          totalPendingWithdrawals: Math.round(totalPendingWithdrawals * 100) / 100,
+          creatorWallets: Math.round(creatorWallets * 100) / 100,
+          campaignEscrows: Math.round(campaignEscrows * 100) / 100,
+          clipperBalancesSum: Math.round(clipperBalancesSum * 100) / 100,
+          assets: Math.round(netAssets * 100) / 100,
+          liabilitiesAndEquity: Math.round(netLiabilitiesAndEquity * 100) / 100,
+          difference: Math.round(ledgerSumDifference * 100) / 100,
+          balanced: ledgerSumBalanced
+        },
+        cpmVerification: {
+          activeCampaignsCount: activeCampaigns.length,
+          invalidCampaigns: invalidCpmCampaigns,
+          allValid: invalidCpmCampaigns.length === 0
+        },
+        outOfSyncProfiles: {
+          creators: outOfSyncCreators,
+          clippers: outOfSyncClippers,
+          allSynced: outOfSyncCreators.length === 0 && outOfSyncClippers.length === 0
+        }
+      });
+    } catch (err: any) {
+      console.error("Reconciliation failed:", err);
+      res.status(500).json({ error: "Reconciliation engine failed", details: err.message });
+    }
   });
 
   // System stats API for Admin & landing page counts
