@@ -8,7 +8,7 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent, AuditEvent, FraudEvent } from "./src/types.js";
+import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent, AuditEvent, FraudEvent, PaymentRecord } from "./src/types.js";
 import {
   detectPlatform,
   normalizeSocialUrl,
@@ -27,6 +27,8 @@ import {
   validateCampaignTransition,
   validateSubmissionTransition
 } from "./src/services/stateMachineService.js";
+import { getPaymentProvider } from "./src/services/paymentProvider.js";
+import { getKycProvider } from "./src/services/kycProvider.js";
 
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
@@ -721,6 +723,25 @@ function runFinancialMigration(db: DbSchema) {
   }
 }
 
+// Masking helpers for sensitive data
+function maskAadhaar(aadhaar: string): string {
+  if (!aadhaar) return "";
+  if (aadhaar.includes("X") || aadhaar.includes("x")) return aadhaar;
+  const cleaned = aadhaar.replace(/\s/g, "");
+  if (cleaned.length < 4) return "XXXX";
+  const visible = cleaned.slice(-4);
+  return `XXXX XXXX ${visible}`;
+}
+
+function maskPan(pan: string): string {
+  if (!pan) return "";
+  if (pan.includes("X") || pan.includes("x")) return pan;
+  const cleaned = pan.replace(/\s/g, "");
+  if (cleaned.length < 4) return "XXXXX";
+  const visible = cleaned.slice(-4);
+  return `XXXXX${visible.toUpperCase()}`;
+}
+
 // Helper to load database
 const loadDb = (): DbSchema => {
   let db: DbSchema;
@@ -938,6 +959,22 @@ const loadDb = (): DbSchema => {
   // Run financial double-entry ledger migration/updates
   runFinancialMigration(db);
 
+  // Sanitize legacy Clipper profile sensitive data
+  let sanitized = false;
+  if (db.clipperProfiles) {
+    for (const key of Object.keys(db.clipperProfiles)) {
+      const profile = db.clipperProfiles[key];
+      if (profile.kycAadhaar && !profile.kycAadhaar.startsWith("XXXX")) {
+        profile.kycAadhaar = maskAadhaar(profile.kycAadhaar);
+        sanitized = true;
+      }
+      if (profile.kycPan && !profile.kycPan.startsWith("XXXXX")) {
+        profile.kycPan = maskPan(profile.kycPan);
+        sanitized = true;
+      }
+    }
+  }
+
   // Ensure all users have hashed passwords
   let updated = false;
   db.users = db.users.map((user) => {
@@ -948,7 +985,7 @@ const loadDb = (): DbSchema => {
     return user;
   });
 
-  if (updated) {
+  if (updated || sanitized) {
     saveDb(db);
   }
 
@@ -1401,16 +1438,16 @@ const startServer = async () => {
         youtubeHandle: youtubeHandle || "",
         kycStatus: "Pending",
         kycDocUrl: kycDocUrl || "",
-        kycAadhaar: kycAadhaar || "",
-        kycPan: kycPan || ""
+        kycAadhaar: kycAadhaar ? maskAadhaar(kycAadhaar) : "",
+        kycPan: kycPan ? maskPan(kycPan) : ""
       };
       db.clipperProfiles[req.user.id] = profile;
     } else {
       profile.upiId = upiId ?? profile.upiId;
       profile.instagramHandle = instagramHandle ?? profile.instagramHandle;
       profile.youtubeHandle = youtubeHandle ?? profile.youtubeHandle;
-      profile.kycAadhaar = kycAadhaar ?? profile.kycAadhaar;
-      profile.kycPan = kycPan ?? profile.kycPan;
+      profile.kycAadhaar = kycAadhaar !== undefined && kycAadhaar !== null ? maskAadhaar(kycAadhaar) : profile.kycAadhaar;
+      profile.kycPan = kycPan !== undefined && kycPan !== null ? maskPan(kycPan) : profile.kycPan;
       if (kycDocUrl) profile.kycDocUrl = kycDocUrl;
       
       // If updating onboarding first time, set status to Pending
@@ -1516,6 +1553,262 @@ const startServer = async () => {
     const db = loadDb();
     const history = db.walletHistory.filter(t => t.userId === req.user.id || (req.user.role === 'admin'));
     res.json(history);
+  });
+
+  // --- STEP 4A PAYMENT AND KYC ENDPOINTS ---
+
+  app.post("/api/payments/create-order", authenticateUser, async (req: any, res) => {
+    if (req.user.role !== "creator" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only authenticated creators can initiate payment orders." });
+    }
+
+    const { amountPaise, currency = "INR" } = req.body;
+    if (!amountPaise || typeof amountPaise !== "number" || amountPaise <= 0 || !Number.isInteger(amountPaise)) {
+      return res.status(400).json({ error: "Invalid payment amount: amountPaise must be a positive integer representing paise." });
+    }
+
+    try {
+      const provider = getPaymentProvider();
+      const order = await provider.createOrder({
+        userId: req.user.id,
+        amountPaise,
+        currency
+      });
+
+      const db = loadDb();
+      if (!db.payments) {
+        db.payments = [];
+      }
+
+      const paymentRecord: PaymentRecord = {
+        id: "pay-" + Math.random().toString(36).substring(2, 9),
+        provider: process.env.PAYMENT_PROVIDER || "mock",
+        provider_order_id: order.id,
+        user_id: req.user.id,
+        amount_paise: amountPaise,
+        currency,
+        status: "created",
+        verification_attempts: 0,
+        created_at: new Date().toISOString()
+      };
+
+      db.payments.push(paymentRecord);
+      saveDb(db);
+
+      res.status(201).json({
+        provider: paymentRecord.provider,
+        testMode: paymentRecord.provider === "mock",
+        order,
+        paymentRecord
+      });
+    } catch (err: any) {
+      console.error("Create order failed:", err);
+      res.status(500).json({ error: err.message || "Failed to create payment order." });
+    }
+  });
+
+  app.post("/api/payments/verify", authenticateUser, async (req: any, res) => {
+    const { orderId, paymentId, signature } = req.body;
+
+    if (!orderId || !paymentId || !signature) {
+      return res.status(400).json({ error: "Missing required parameters: orderId, paymentId, and signature are required." });
+    }
+
+    const db = loadDb();
+    if (!db.payments) db.payments = [];
+
+    const paymentRecord = db.payments.find(p => p.provider_order_id === orderId);
+    if (!paymentRecord) {
+      return res.status(404).json({ error: "Payment record not found for the specified orderId." });
+    }
+
+    if (paymentRecord.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
+    }
+
+    if (paymentRecord.status === "paid") {
+      return res.status(400).json({ error: "Duplicate verification rejected: This payment has already been verified and credited." });
+    }
+
+    paymentRecord.verification_attempts += 1;
+
+    try {
+      const provider = getPaymentProvider();
+      const result = await provider.verifyPayment({
+        orderId,
+        paymentId,
+        signature
+      });
+
+      if (!result.success) {
+        paymentRecord.status = "failed";
+        saveDb(db);
+        return res.status(400).json({
+          success: false,
+          error: result.error || "Payment verification failed",
+          provider: paymentRecord.provider,
+          testMode: paymentRecord.provider === "mock"
+        });
+      }
+
+      paymentRecord.status = "paid";
+      paymentRecord.provider_payment_id = paymentId;
+      paymentRecord.paid_at = new Date().toISOString();
+
+      // Credit creator profile wallet balance
+      let profile = db.creatorProfiles[req.user.id];
+      if (!profile) {
+        profile = { userId: req.user.id, channelUrl: "", walletBalance: 0 };
+        db.creatorProfiles[req.user.id] = profile;
+      }
+
+      const amountINR = paymentRecord.amount_paise / 100;
+      profile.walletBalance = Math.round((profile.walletBalance + amountINR) * 100) / 100;
+
+      // Double-entry financial ledger
+      const refId = `payment-verify-${paymentId}`;
+      const ledgerEntry = recordLedgerEntry(db, {
+        referenceId: refId,
+        referenceType: "deposit",
+        fromAccount: `External (${paymentRecord.provider})`,
+        toAccount: `creator_wallet:${req.user.id}`,
+        userId: req.user.id,
+        amount: amountINR,
+        status: "completed",
+        description: `Deposit via Payment Gateway (Order ID: ${orderId}, Payment ID: ${paymentId})`
+      });
+
+      // Wallet transaction history
+      const transaction: WalletTransaction = {
+        id: "tx-" + paymentId,
+        userId: req.user.id,
+        type: "deposit",
+        amount: amountINR,
+        status: "Completed",
+        description: `Funded via ${paymentRecord.provider} Payment Gateway`,
+        createdAt: ledgerEntry.createdAt
+      };
+      db.walletHistory.push(transaction);
+
+      // Audit event
+      recordAuditEvent(db, req.user.id, req.user.role, "PAYMENT_DEPOSIT_SUCCESS", "payment", paymentRecord.id, {
+        amountPaise: paymentRecord.amount_paise,
+        amountINR,
+        orderId,
+        paymentId,
+        provider: paymentRecord.provider
+      });
+
+      saveDb(db);
+
+      res.json({
+        success: true,
+        provider: paymentRecord.provider,
+        testMode: paymentRecord.provider === "mock",
+        payment: paymentRecord,
+        balance: profile.walletBalance,
+        transaction
+      });
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      res.status(500).json({ error: err.message || "Internal verification error." });
+    }
+  });
+
+  app.post("/api/clipper/kyc/initiate", authenticateUser, async (req: any, res) => {
+    if (req.user.role !== "clipper") {
+      return res.status(403).json({ error: "Only clippers can initiate KYC verification." });
+    }
+
+    const db = loadDb();
+    let profile = db.clipperProfiles[req.user.id];
+    if (!profile) {
+      profile = {
+        userId: req.user.id,
+        upiId: "",
+        instagramHandle: "",
+        youtubeHandle: "",
+        kycStatus: "Pending",
+        kycDocUrl: "",
+        kycAadhaar: "",
+        kycPan: ""
+      };
+      db.clipperProfiles[req.user.id] = profile;
+    }
+
+    try {
+      const provider = getKycProvider();
+      const kycSession = await provider.createVerification(req.user.id);
+
+      profile.kycReferenceId = kycSession.referenceId;
+      profile.kycStatus = kycSession.status as any; // e.g. "Submitted"
+
+      recordAuditEvent(db, req.user.id, req.user.role, "KYC_INITIATED", "user", req.user.id, {
+        referenceId: kycSession.referenceId,
+        status: kycSession.status
+      });
+
+      saveDb(db);
+
+      res.status(201).json({
+        success: true,
+        provider: process.env.KYC_PROVIDER || "mock",
+        testMode: (process.env.KYC_PROVIDER || "mock") === "mock",
+        referenceId: kycSession.referenceId,
+        status: kycSession.status
+      });
+    } catch (err: any) {
+      console.error("KYC initiate failed:", err);
+      res.status(500).json({ error: err.message || "Failed to initiate KYC verification." });
+    }
+  });
+
+  app.get("/api/clipper/kyc/status", authenticateUser, async (req: any, res) => {
+    if (req.user.role !== "clipper") {
+      return res.status(403).json({ error: "Only clippers can fetch KYC status." });
+    }
+
+    const db = loadDb();
+    const profile = db.clipperProfiles[req.user.id];
+    if (!profile) {
+      return res.status(404).json({ error: "Clipper profile not found." });
+    }
+
+    if (!profile.kycReferenceId) {
+      return res.json({
+        status: profile.kycStatus,
+        provider: process.env.KYC_PROVIDER || "mock",
+        testMode: (process.env.KYC_PROVIDER || "mock") === "mock"
+      });
+    }
+
+    try {
+      const provider = getKycProvider();
+      const statusResult = await provider.getVerificationStatus(profile.kycReferenceId);
+
+      if (profile.kycStatus !== statusResult.status) {
+        const oldStatus = profile.kycStatus;
+        profile.kycStatus = statusResult.status as any;
+
+        recordAuditEvent(db, req.user.id, req.user.role, "KYC_STATUS_UPDATED", "user", req.user.id, {
+          oldStatus,
+          newStatus: statusResult.status,
+          reason: statusResult.reason
+        });
+
+        saveDb(db);
+      }
+
+      res.json({
+        status: profile.kycStatus,
+        reason: statusResult.reason,
+        provider: process.env.KYC_PROVIDER || "mock",
+        testMode: (process.env.KYC_PROVIDER || "mock") === "mock"
+      });
+    } catch (err: any) {
+      console.error("Get KYC status failed:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch KYC verification status." });
+    }
   });
 
   // Campaigns API

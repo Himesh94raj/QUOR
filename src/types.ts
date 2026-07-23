@@ -18,7 +18,7 @@ export interface User {
   statusReason?: string | null;
 }
 
-export type KYCStatus = "Pending" | "Verified" | "Rejected";
+export type KYCStatus = "Pending" | "Submitted" | "UnderReview" | "Verified" | "Rejected";
 
 export interface ClipperProfile {
   userId: string;
@@ -29,6 +29,7 @@ export interface ClipperProfile {
   kycDocUrl: string;
   kycAadhaar: string;
   kycPan: string;
+  kycReferenceId?: string;
 }
 
 export interface CreatorProfile {
@@ -146,6 +147,21 @@ export interface ViewPayoutEvent {
   processedAt: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  provider: string;
+  provider_order_id: string;
+  provider_payment_id?: string;
+  user_id: string;
+  amount_paise: number;
+  currency: string;
+  status: "created" | "paid" | "failed";
+  verification_attempts: number;
+  created_at: string;
+  paid_at?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface DbSchema {
   users: User[];
   clipperProfiles: Record<string, ClipperProfile>; // key is userId
@@ -160,6 +176,7 @@ export interface DbSchema {
   viewPayoutEvents?: ViewPayoutEvent[];
   auditEvents?: AuditEvent[];
   fraudEvents?: FraudEvent[];
+  payments?: PaymentRecord[];
 }
 
 export interface AuditEvent {
