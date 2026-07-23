@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/test-financial-ledger.ts && tsx src/test-payments-kyc.ts && tsx src/test-database.ts && tsx src/test-razorpay-integration.ts"
+    "test": "tsx src/test-financial-ledger.ts && tsx src/test-payments-kyc.ts && tsx src/test-database.ts && tsx src/test-razorpay-integration.ts && tsx src/test-razorpay-webhooks.ts && tsx src/test-payment-reconciliation.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

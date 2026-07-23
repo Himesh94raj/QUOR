@@ -162,6 +162,16 @@ export interface PaymentRecord {
   metadata?: Record<string, any>;
 }
 
+export interface WebhookEventRecord {
+  id: string; // Razorpay event ID
+  provider: string; // 'razorpay'
+  event_type: string; // e.g. 'payment.captured'
+  received_at: string;
+  processed_at?: string;
+  processing_status: "received" | "processed" | "failed";
+  payload?: Record<string, any>;
+}
+
 export interface DbSchema {
   users: User[];
   clipperProfiles: Record<string, ClipperProfile>; // key is userId
@@ -177,6 +187,7 @@ export interface DbSchema {
   auditEvents?: AuditEvent[];
   fraudEvents?: FraudEvent[];
   payments?: PaymentRecord[];
+  webhookEvents?: WebhookEventRecord[];
 }
 
 export interface AuditEvent {

@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+import Razorpay from "razorpay";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
@@ -37,6 +38,8 @@ import { paymentRepository } from "./src/services/paymentRepository.js";
 import { ledgerRepository } from "./src/services/ledgerRepository.js";
 import { payoutRepository } from "./src/services/payoutRepository.js";
 import { auditRepository } from "./src/services/auditRepository.js";
+import { webhookEventRepository } from "./src/services/webhookEventRepository.js";
+import { runPaymentReconciliation } from "./src/services/paymentReconciliation.js";
 
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
@@ -1005,7 +1008,14 @@ const startServer = async () => {
   const PORT = 3000;
 
   // Middleware for parsing JSON & cookies
-  app.use(express.json({ limit: "15mb" }));
+  app.use(
+    express.json({
+      limit: "15mb",
+      verify: (req: any, res, buf) => {
+        req.rawBody = buf.toString("utf-8");
+      }
+    })
+  );
 
   // CORS configuration for cross-origin requests
   const corsOptions = {
@@ -1155,6 +1165,40 @@ const startServer = async () => {
     }
 
     next();
+  };
+
+  const createPaymentAuditEvent = async (
+    action: string,
+    paymentId?: string,
+    orderId?: string,
+    userId?: string,
+    source: "frontend" | "webhook" | "admin" | "system" = "system",
+    metadata: Record<string, any> = {}
+  ) => {
+    try {
+      const safeMeta: any = { ...metadata, source, orderId, paymentId };
+      // Redact sensitive details
+      delete safeMeta.secret;
+      delete safeMeta.webhookSecret;
+      delete safeMeta.signature;
+      if (safeMeta.payload) {
+        delete safeMeta.payload.secret;
+        delete safeMeta.payload.webhookSecret;
+      }
+
+      await auditRepository.createEvent({
+        id: `aud-evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        actorUserId: userId || "system",
+        actorRole: userId ? "creator" : "system",
+        action,
+        entityType: "payment",
+        entityId: paymentId || orderId || "unknown",
+        metadata: safeMeta,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to log payment audit event:", err);
+    }
   };
 
   // Auth Endpoints
@@ -1583,11 +1627,6 @@ const startServer = async () => {
         currency
       });
 
-      const db = loadDb();
-      if (!db.payments) {
-        db.payments = [];
-      }
-
       const paymentRecord: PaymentRecord = {
         id: "pay-" + Math.random().toString(36).substring(2, 9),
         provider: process.env.PAYMENT_PROVIDER || "mock",
@@ -1600,8 +1639,13 @@ const startServer = async () => {
         created_at: new Date().toISOString()
       };
 
-      db.payments.push(paymentRecord);
-      saveDb(db);
+      await paymentRepository.createPayment(paymentRecord);
+
+      await createPaymentAuditEvent("PAYMENT_ORDER_CREATED", paymentRecord.id, order.id, req.user.id, "frontend", {
+        amountPaise,
+        currency,
+        provider: paymentRecord.provider
+      });
 
       res.status(201).json({
         provider: paymentRecord.provider,
@@ -1632,17 +1676,66 @@ const startServer = async () => {
         return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
       }
 
-      if (paymentRecord.status === "paid") {
-        return res.status(400).json({ error: "Duplicate verification rejected: This payment has already been verified and credited." });
+      // PAYMENT STATE MACHINE ENFORCEMENT
+      if (paymentRecord.status === "failed") {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: "Forbidden state transition: Cannot transition from failed to paid."
+        });
+        return res.status(400).json({ error: "Forbidden state transition: Cannot transition from failed to paid." });
       }
+
+      if (paymentRecord.status === "paid") {
+        // Fetch updated balance and transaction history for compatibility (idempotent paid -> paid)
+        let walletBalance = 0;
+        let transaction: any = null;
+        const txId = `tx-${paymentId}`;
+
+        if (dbProvider === "supabase") {
+          const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", req.user.id).maybeSingle();
+          if (profileData) {
+            walletBalance = Number(profileData.wallet_balance) / 100;
+          }
+          const { data: txData } = await supabase.from("wallet_history").select("*").eq("id", txId).maybeSingle();
+          if (txData) {
+            transaction = txData;
+          }
+        } else {
+          const db = loadDb();
+          const profile = db.creatorProfiles[req.user.id];
+          walletBalance = profile ? profile.walletBalance : 0;
+          transaction = db.walletHistory.find(tx => tx.id === txId);
+        }
+
+        return res.json({
+          success: true,
+          message: "Payment has already been verified and credited (idempotent).",
+          provider: paymentRecord.provider,
+          testMode: paymentRecord.provider === "mock",
+          payment: paymentRecord,
+          balance: walletBalance,
+          transaction
+        });
+      }
+
+      // Record verification attempt audit
+      await createPaymentAuditEvent("PAYMENT_VERIFICATION_ATTEMPTED", paymentRecord.id, orderId, req.user.id, "frontend", {
+        paymentId,
+        orderId
+      });
 
       // Prevent amount mismatch
       if (amountPaise !== undefined && amountPaise !== paymentRecord.amount_paise) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: "Amount mismatch: Verified payment amount does not match the order."
+        });
         return res.status(400).json({ error: "Amount mismatch: Verified payment amount does not match the order." });
       }
 
       // Prevent currency mismatch
       if (currency !== undefined && currency !== paymentRecord.currency) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: "Currency mismatch: Verified payment currency does not match the order."
+        });
         return res.status(400).json({ error: "Currency mismatch: Verified payment currency does not match the order." });
       }
 
@@ -1661,6 +1754,9 @@ const startServer = async () => {
       }
 
       if (isPaymentIdReused) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: "Payment ID has already been used and verified."
+        });
         return res.status(400).json({ error: "Payment ID has already been used and verified." });
       }
 
@@ -1676,6 +1772,14 @@ const startServer = async () => {
         paymentRecord.status = "failed";
         paymentRecord.verification_attempts += 1;
         await paymentRepository.updatePayment(paymentRecord);
+
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: result.error || "Payment verification failed"
+        });
+        await createPaymentAuditEvent("PAYMENT_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          reason: result.error || "Payment verification failed"
+        });
+
         return res.status(400).json({
           success: false,
           error: result.error || "Payment verification failed",
@@ -1704,11 +1808,20 @@ const startServer = async () => {
       });
 
       if (!depositResult.success) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, orderId, req.user.id, "frontend", {
+          error: depositResult.error || "Atomic ledger funding operation failed."
+        });
         return res.status(500).json({
           success: false,
           error: depositResult.error || "Atomic ledger funding operation failed."
         });
       }
+
+      // Log successful verification and payment
+      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, orderId, req.user.id, "frontend", {
+        paymentId,
+        orderId
+      });
 
       // Fetch updated balance and transaction history for compatibility
       let walletBalance = 0;
@@ -1743,6 +1856,435 @@ const startServer = async () => {
     } catch (err: any) {
       console.error("Verification error:", err);
       res.status(500).json({ error: err.message || "Internal verification error." });
+    }
+  });
+
+  // --- STANDARD RAZORPAY COMPATIBILITY ENDPOINTS ---
+  app.post("/api/create-order", authenticateUser, async (req: any, res) => {
+    const { amount, currency = "INR", receipt } = req.body;
+    if (!amount || typeof amount !== "number" || amount < 100 || !Number.isInteger(amount)) {
+      return res.status(400).json({ error: "Invalid payment amount: amount must be an integer >= 100 paise." });
+    }
+
+    try {
+      const provider = getPaymentProvider();
+      const order = await provider.createOrder({
+        userId: req.user.id,
+        amountPaise: amount,
+        currency
+      });
+
+      const paymentRecord: PaymentRecord = {
+        id: "pay-" + Math.random().toString(36).substring(2, 9),
+        provider: process.env.PAYMENT_PROVIDER || "mock",
+        provider_order_id: order.id,
+        user_id: req.user.id,
+        amount_paise: amount,
+        currency,
+        status: "created",
+        verification_attempts: 0,
+        created_at: new Date().toISOString()
+      };
+
+      await paymentRepository.createPayment(paymentRecord);
+
+      await createPaymentAuditEvent("PAYMENT_ORDER_CREATED", paymentRecord.id, order.id, req.user.id, "frontend", {
+        amountPaise: amount,
+        currency,
+        provider: paymentRecord.provider
+      });
+
+      res.status(201).json({
+        order_id: order.id,
+        amount,
+        currency
+      });
+    } catch (err: any) {
+      console.error("Create order failed:", err);
+      res.status(500).json({ error: err.message || "Failed to create payment order." });
+    }
+  });
+
+  app.post("/api/verify-payment", authenticateUser, async (req: any, res) => {
+    const { order_id, payment_id, razorpay_signature } = req.body;
+
+    if (!order_id || !payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: "Missing required parameters: order_id, payment_id, and razorpay_signature are required." });
+    }
+
+    try {
+      const paymentRecord = await paymentRepository.findByOrderId(order_id);
+      if (!paymentRecord) {
+        return res.status(404).json({ error: "Payment record not found for the specified order_id." });
+      }
+
+      if (paymentRecord.user_id !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
+      }
+
+      // PAYMENT STATE MACHINE ENFORCEMENT
+      if (paymentRecord.status === "failed") {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
+          error: "Forbidden state transition: Cannot transition from failed to paid."
+        });
+        return res.status(400).json({ error: "Forbidden state transition: Cannot transition from failed to paid." });
+      }
+
+      if (paymentRecord.status === "paid") {
+        // Fetch updated balance for compatibility
+        let walletBalance = 0;
+        if (dbProvider === "supabase") {
+          const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", req.user.id).maybeSingle();
+          if (profileData) {
+            walletBalance = Number(profileData.wallet_balance) / 100;
+          }
+        } else {
+          const db = loadDb();
+          const profile = db.creatorProfiles[req.user.id];
+          walletBalance = profile ? profile.walletBalance : 0;
+        }
+
+        return res.json({
+          success: true,
+          message: "Payment has already been verified and credited (idempotent)."
+        });
+      }
+
+      // Prevent payment ID reuse
+      let isPaymentIdReused = false;
+      if (dbProvider === "supabase") {
+        const { data, error } = await supabase.from("payments").select("id").eq("provider_payment_id", payment_id).eq("status", "paid").maybeSingle();
+        if (!error && data) {
+          isPaymentIdReused = true;
+        }
+      } else {
+        const db = loadDb();
+        if (db.payments) {
+          isPaymentIdReused = db.payments.some(p => p.provider_payment_id === payment_id && p.status === "paid");
+        }
+      }
+
+      if (isPaymentIdReused) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
+          error: "Payment ID has already been used and verified."
+        });
+        return res.status(400).json({ error: "Payment ID has already been used and verified." });
+      }
+
+      // Verification using the provider
+      const provider = getPaymentProvider();
+      const result = await provider.verifyPayment({
+        orderId: order_id,
+        paymentId: payment_id,
+        signature: razorpay_signature
+      });
+
+      if (!result.success) {
+        paymentRecord.status = "failed";
+        paymentRecord.verification_attempts += 1;
+        await paymentRepository.updatePayment(paymentRecord);
+
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
+          error: result.error || "Payment verification failed"
+        });
+        await createPaymentAuditEvent("PAYMENT_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
+          reason: result.error || "Payment verification failed"
+        });
+
+        return res.status(400).json({
+          success: false,
+          error: result.error || "Signature verification failed"
+        });
+      }
+
+      // Atomic deposit to ledger
+      const refId = `payment-verify-${payment_id}`;
+      const ledgerId = `led-${payment_id}`;
+      const txId = `tx-${payment_id}`;
+      const auditId = `aud-${payment_id}`;
+
+      const depositResult = await paymentRepository.depositCreatorFundsRpc({
+        userId: req.user.id,
+        orderId: order_id,
+        paymentId: payment_id,
+        amountPaise: paymentRecord.amount_paise,
+        provider: paymentRecord.provider,
+        currency: paymentRecord.currency || "INR",
+        refId,
+        ledgerId,
+        txId,
+        auditId
+      });
+
+      if (!depositResult.success) {
+        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
+          error: depositResult.error || "Atomic ledger funding operation failed."
+        });
+        return res.status(500).json({
+          success: false,
+          error: depositResult.error || "Atomic ledger funding operation failed."
+        });
+      }
+
+      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, order_id, req.user.id, "frontend", {
+        paymentId: payment_id,
+        orderId: order_id
+      });
+
+      res.json({
+        success: true,
+        message: "Payment successfully verified and credited."
+      });
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      res.status(500).json({ error: err.message || "Internal verification error." });
+    }
+  });
+
+  app.post("/api/payments/webhook", async (req: any, res) => {
+    try {
+      const signature = req.headers["x-razorpay-signature"] as string;
+      if (!signature) {
+        return res.status(400).json({ error: "Missing x-razorpay-signature header." });
+      }
+
+      if (!req.body || typeof req.body !== "object") {
+        return res.status(400).json({ error: "Malformed payload." });
+      }
+
+      const eventId = req.body.id;
+      const eventType = req.body.event;
+
+      if (!eventId || !eventType) {
+        return res.status(400).json({ error: "Missing event ID or event type." });
+      }
+
+      // 1. Signature Verification
+      let isVerified = false;
+      const providerType = (process.env.PAYMENT_PROVIDER || "mock").toLowerCase();
+      if (providerType === "razorpay") {
+        const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!webhookSecret) {
+          return res.status(500).json({ error: "Server configuration error: RAZORPAY_WEBHOOK_SECRET is missing." });
+        }
+        isVerified = Razorpay.validateWebhookSignature(
+          req.rawBody || "",
+          signature,
+          webhookSecret
+        );
+      } else {
+        // In mock mode, prevent invalid signature
+        if (signature === "invalid_signature" || signature === "invalid_sig" || signature.includes("invalid")) {
+          isVerified = false;
+        } else {
+          isVerified = true;
+        }
+      }
+
+      if (!isVerified) {
+        await createPaymentAuditEvent("PAYMENT_WEBHOOK_SIGNATURE_FAILED", undefined, undefined, undefined, "webhook", { signature });
+        return res.status(400).json({ error: "Invalid webhook signature." });
+      }
+
+      // 2. Webhook Event Idempotency
+      const existingEvent = await webhookEventRepository.findById("razorpay", eventId);
+      if (existingEvent) {
+        await createPaymentAuditEvent("PAYMENT_WEBHOOK_DUPLICATE", undefined, undefined, undefined, "webhook", { eventId, eventType });
+        if (existingEvent.processing_status === "processed") {
+          return res.json({ success: true, message: "Webhook event already processed (idempotent)." });
+        }
+        if (existingEvent.processing_status === "failed") {
+          return res.json({ success: false, error: "Webhook event previously failed." });
+        }
+        return res.json({ success: true, message: "Webhook event is currently being processed." });
+      }
+
+      // Safely extract payload parameters
+      let paymentId: string | undefined = undefined;
+      let orderId: string | undefined = undefined;
+      let amountPaise: number | undefined = undefined;
+      let currency: string | undefined = undefined;
+
+      const payload = req.body.payload;
+      if (payload) {
+        if (payload.payment && payload.payment.entity) {
+          paymentId = payload.payment.entity.id;
+          orderId = payload.payment.entity.order_id;
+          amountPaise = payload.payment.entity.amount;
+          currency = payload.payment.entity.currency;
+        }
+        if (payload.order && payload.order.entity) {
+          if (!orderId) {
+            orderId = payload.order.entity.id;
+          }
+          if (amountPaise === undefined) {
+            amountPaise = payload.order.entity.amount;
+          }
+          if (!currency) {
+            currency = payload.order.entity.currency;
+          }
+        }
+      }
+
+      // Create event as received (marks start of processing)
+      try {
+        await webhookEventRepository.createEvent({
+          id: eventId,
+          provider: "razorpay",
+          event_type: eventType,
+          received_at: new Date().toISOString(),
+          processing_status: "received",
+          payload: {
+            orderId,
+            paymentId,
+            amountPaise,
+            currency
+          }
+        });
+        await createPaymentAuditEvent("PAYMENT_WEBHOOK_RECEIVED", paymentId, orderId, undefined, "webhook", { eventId, eventType });
+      } catch (err: any) {
+        // Concurrent duplicate request was faster and already created the event
+        await createPaymentAuditEvent("PAYMENT_WEBHOOK_DUPLICATE", paymentId, orderId, undefined, "webhook", { eventId, eventType });
+        return res.json({ success: true, message: "Webhook event is already being processed or processed." });
+      }
+
+      // Check supported events
+      const allowedEvents = ["payment.captured", "payment.failed", "order.paid"];
+      if (!allowedEvents.includes(eventType)) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+        return res.json({ success: true, message: `Ignoring unsupported event type: ${eventType}` });
+      }
+
+      if (!orderId) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: "Missing orderId in webhook payload." });
+      }
+
+      // 3. Find matching payment record
+      const paymentRecord = await paymentRepository.findByOrderId(orderId);
+      if (!paymentRecord) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(404).json({ error: `Payment record not found for orderId: ${orderId}` });
+      }
+
+      // Verify provider match
+      if (paymentRecord.provider !== providerType) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: "Payment provider mismatch." });
+      }
+
+      // 4. Handle failure event
+      if (eventType === "payment.failed") {
+        if (paymentRecord.status === "paid") {
+          await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+          return res.json({ success: true, message: "Payment already successfully settled; ignoring failure event." });
+        }
+        if (paymentRecord.status === "failed") {
+          await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+          return res.json({ success: true, message: "Payment already marked as failed." });
+        }
+
+        paymentRecord.status = "failed";
+        paymentRecord.verification_attempts += 1;
+        if (!paymentRecord.metadata) paymentRecord.metadata = {};
+        paymentRecord.metadata.failure_reason = payload?.payment?.entity?.error_description || "Payment failed via webhook";
+        await paymentRepository.updatePayment(paymentRecord);
+
+        await createPaymentAuditEvent("PAYMENT_FAILED", paymentRecord.id, orderId, paymentRecord.user_id, "webhook", {
+          eventId,
+          reason: paymentRecord.metadata.failure_reason
+        });
+
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+        return res.json({ success: true, message: "Payment marked as failed." });
+      }
+
+      // 5. Handle success events (payment.captured, order.paid)
+      if (paymentRecord.status === "paid") {
+        // Already paid and credited, idempotent success
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+        return res.json({ success: true, message: "Payment already verified and financially settled." });
+      }
+
+      if (paymentRecord.status === "failed") {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: "Cannot process success event for an already failed payment record." });
+      }
+
+      // Verify exact amount match in paise
+      if (amountPaise !== undefined && paymentRecord.amount_paise !== amountPaise) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: `Amount mismatch: expected ${paymentRecord.amount_paise}, received ${amountPaise}.` });
+      }
+
+      // Verify exact currency match
+      if (currency !== undefined && paymentRecord.currency !== currency) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: `Currency mismatch: expected ${paymentRecord.currency}, received ${currency}.` });
+      }
+
+      // Extract payment ID from payload or fallback to a deterministic value
+      const finalPaymentId = paymentId || `pay_rzp_webhook_${eventId}`;
+
+      // Check payment ID reuse
+      let isPaymentIdReused = false;
+      if (dbProvider === "supabase") {
+        const { data, error } = await supabase.from("payments").select("id").eq("provider_payment_id", finalPaymentId).eq("status", "paid").maybeSingle();
+        if (!error && data) {
+          isPaymentIdReused = true;
+        }
+      } else {
+        const db = loadDb();
+        if (db.payments) {
+          isPaymentIdReused = db.payments.some(p => p.provider_payment_id === finalPaymentId && p.status === "paid");
+        }
+      }
+
+      if (isPaymentIdReused) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(400).json({ error: "Payment ID has already been used and verified." });
+      }
+
+      // Atomically deposit funds via the double-entry RPC
+      const refId = `payment-verify-${finalPaymentId}`;
+      const ledgerId = `led-${finalPaymentId}`;
+      const txId = `tx-${finalPaymentId}`;
+      const auditId = `aud-${finalPaymentId}`;
+
+      const depositResult = await paymentRepository.depositCreatorFundsRpc({
+        userId: paymentRecord.user_id,
+        orderId,
+        paymentId: finalPaymentId,
+        amountPaise: paymentRecord.amount_paise,
+        provider: paymentRecord.provider,
+        currency: paymentRecord.currency || "INR",
+        refId,
+        ledgerId,
+        txId,
+        auditId
+      });
+
+      if (!depositResult.success) {
+        await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
+        return res.status(500).json({ error: depositResult.error || "Atomic ledger funding operation failed." });
+      }
+
+      // Log successful verification and payment via webhook
+      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, orderId, paymentRecord.user_id, "webhook", {
+        eventId,
+        paymentId: finalPaymentId
+      });
+
+      // Mark the webhook event as processed
+      await webhookEventRepository.updateEventStatus("razorpay", eventId, "processed");
+
+      return res.json({
+        success: true,
+        message: "Payment successfully reconciled and credited to creator wallet."
+      });
+    } catch (err: any) {
+      console.error("Webhook processing error:", err);
+      return res.status(500).json({ error: err.message || "Internal webhook processing error." });
     }
   });
 
@@ -2840,6 +3382,66 @@ const startServer = async () => {
     const db = loadDb();
     const pending = db.payoutRequests.filter(p => p.status === "Processing");
     res.json(pending);
+  });
+
+  app.get("/api/admin/finance/payment-reconciliation", authenticateUser, requireOwnerAdmin, async (req: any, res) => {
+    try {
+      const report = await runPaymentReconciliation();
+
+      // Log mismatch auditing if status is CRITICAL or WARNING
+      if (report.status !== "RECONCILED") {
+        for (const mismatch of report.mismatches) {
+          await createPaymentAuditEvent(
+            "PAYMENT_RECONCILIATION_MISMATCH",
+            mismatch.paymentId,
+            mismatch.providerOrderId,
+            undefined,
+            "admin",
+            {
+              type: mismatch.type,
+              details: mismatch.details
+            }
+          );
+        }
+
+        for (const dup of report.duplicateRecords) {
+          await createPaymentAuditEvent(
+            "PAYMENT_RECONCILIATION_MISMATCH",
+            undefined,
+            undefined,
+            undefined,
+            "admin",
+            {
+              type: dup.type,
+              id: dup.id,
+              details: dup.details
+            }
+          );
+        }
+
+        for (const lm of report.ledgerMismatches) {
+          await createPaymentAuditEvent(
+            "PAYMENT_RECONCILIATION_MISMATCH",
+            undefined,
+            undefined,
+            lm.userId,
+            "admin",
+            {
+              type: "LEDGER_BALANCE_MISMATCH",
+              userId: lm.userId,
+              profileBalance: lm.profileBalance,
+              reconstructedBalance: lm.reconstructedBalance,
+              details: lm.details
+            }
+          );
+        }
+      }
+
+      res.json(report);
+    } catch (err: any) {
+      console.error("Payment reconciliation endpoint error:", err);
+      res.status(500).json({ error: err.message || "Internal payment reconciliation error." });
+    }
   });
 
   // Verification and System Reconciliation Endpoint

@@ -119,6 +119,104 @@
       "role": "clipper",
       "status": "active",
       "createdAt": "2026-07-23T12:04:23.056Z"
+    },
+    {
+      "id": "test-creator-7nw6e",
+      "name": "Test Creator DB",
+      "email": "test-creator-7nw6e@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:12:40.354Z"
+    },
+    {
+      "id": "test-clipper-74dav",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-74dav@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T12:12:40.355Z"
+    },
+    {
+      "id": "creator_webhook_tester",
+      "name": "Webhook Tester",
+      "email": "tester@quor.in",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:12:42.190Z"
+    },
+    {
+      "id": "test-creator-fts3w",
+      "name": "Test Creator DB",
+      "email": "test-creator-fts3w@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:28:59.289Z"
+    },
+    {
+      "id": "test-clipper-z5fxt",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-z5fxt@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T12:28:59.290Z"
+    },
+    {
+      "id": "test-creator-led8e",
+      "name": "Test Creator DB",
+      "email": "test-creator-led8e@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:29:23.201Z"
+    },
+    {
+      "id": "test-clipper-aacqd",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-aacqd@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T12:29:23.201Z"
+    },
+    {
+      "id": "test-creator-uq1cf",
+      "name": "Test Creator DB",
+      "email": "test-creator-uq1cf@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:30:24.626Z"
+    },
+    {
+      "id": "test-clipper-r8oaw",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-r8oaw@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T12:30:24.626Z"
+    },
+    {
+      "id": "test-creator-wuzoj",
+      "name": "Test Creator DB",
+      "email": "test-creator-wuzoj@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T12:41:46.690Z"
+    },
+    {
+      "id": "test-clipper-mrana",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-mrana@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T12:41:46.690Z"
     }
   ],
   "clipperProfiles": {
@@ -178,6 +276,56 @@
       "kycDocUrl": "https://example.com/doc",
       "kycAadhaar": "1234 5678 9012",
       "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-74dav": {
+      "userId": "test-clipper-74dav",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-z5fxt": {
+      "userId": "test-clipper-z5fxt",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-aacqd": {
+      "userId": "test-clipper-aacqd",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-r8oaw": {
+      "userId": "test-clipper-r8oaw",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-mrana": {
+      "userId": "test-clipper-mrana",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
     }
   },
   "creatorProfiles": {
@@ -223,6 +371,36 @@
     },
     "test-creator-bqizl": {
       "userId": "test-creator-bqizl",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "test-creator-7nw6e": {
+      "userId": "test-creator-7nw6e",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "creator_webhook_tester": {
+      "userId": "creator_webhook_tester",
+      "channelUrl": "https://youtube.com/c/tester",
+      "walletBalance": 2900
+    },
+    "test-creator-fts3w": {
+      "userId": "test-creator-fts3w",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "test-creator-led8e": {
+      "userId": "test-creator-led8e",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "test-creator-uq1cf": {
+      "userId": "test-creator-uq1cf",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "test-creator-wuzoj": {
+      "userId": "test-creator-wuzoj",
       "channelUrl": "https://youtube.com/test",
       "walletBalance": 1000
     }
@@ -331,6 +509,96 @@
       "status": "Active",
       "campaignType": "clipping",
       "createdAt": "2026-07-23T12:04:23.066Z"
+    },
+    {
+      "id": "test-campaign-h05ti",
+      "creatorId": "test-creator-7nw6e",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T12:12:40.365Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T12:12:40.366Z"
+    },
+    {
+      "id": "test-campaign-oy29d",
+      "creatorId": "test-creator-fts3w",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T12:28:59.304Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T12:28:59.305Z"
+    },
+    {
+      "id": "test-campaign-3tfc8",
+      "creatorId": "test-creator-led8e",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T12:29:23.217Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T12:29:23.218Z"
+    },
+    {
+      "id": "test-campaign-iehnw",
+      "creatorId": "test-creator-uq1cf",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T12:30:24.633Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T12:30:24.634Z"
+    },
+    {
+      "id": "test-campaign-r9gyc",
+      "creatorId": "test-creator-wuzoj",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T12:41:46.698Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T12:41:46.698Z"
     }
   ],
   "submissions": [
@@ -408,161 +676,118 @@
       "approvedAt": "2026-07-23T12:04:23.068Z",
       "lastFetchedViews": "2026-07-23T12:04:23.070Z",
       "createdAt": "2026-07-23T12:04:23.068Z"
+    },
+    {
+      "id": "test-sub-nq4yh",
+      "campaignId": "test-campaign-h05ti",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-74dav",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T12:12:40.367Z",
+      "lastFetchedViews": "2026-07-23T12:12:40.370Z",
+      "createdAt": "2026-07-23T12:12:40.367Z"
+    },
+    {
+      "id": "test-sub-d8g8u",
+      "campaignId": "test-campaign-oy29d",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-z5fxt",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T12:28:59.308Z",
+      "lastFetchedViews": "2026-07-23T12:28:59.318Z",
+      "createdAt": "2026-07-23T12:28:59.308Z"
+    },
+    {
+      "id": "test-sub-cs4se",
+      "campaignId": "test-campaign-3tfc8",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-aacqd",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T12:29:23.221Z",
+      "lastFetchedViews": "2026-07-23T12:29:23.230Z",
+      "createdAt": "2026-07-23T12:29:23.221Z"
+    },
+    {
+      "id": "test-sub-373vb",
+      "campaignId": "test-campaign-iehnw",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-r8oaw",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T12:30:24.635Z",
+      "lastFetchedViews": "2026-07-23T12:30:24.639Z",
+      "createdAt": "2026-07-23T12:30:24.635Z"
+    },
+    {
+      "id": "test-sub-5s97v",
+      "campaignId": "test-campaign-r9gyc",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-mrana",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T12:41:46.702Z",
+      "lastFetchedViews": "2026-07-23T12:41:46.705Z",
+      "createdAt": "2026-07-23T12:41:46.702Z"
     }
   ],
   "walletHistory": [
     {
-      "id": "tx-1",
-      "userId": "creator-hassan",
-      "type": "deposit",
-      "amount": 15400,
-      "status": "Completed",
-      "description": "Fund Added via Razorpay",
-      "createdAt": "2026-06-29T18:08:12.308Z"
-    },
-    {
-      "id": "tx-2",
-      "userId": "creator-hassan",
-      "type": "payment",
-      "amount": 2400,
-      "status": "Completed",
-      "description": "Payout for Samir Kulkarni (sub-1) views",
-      "createdAt": "2026-07-01T18:08:12.308Z"
-    },
-    {
-      "id": "tx-3",
-      "userId": "clipper-sam",
-      "type": "payment",
-      "amount": 2400,
-      "status": "Completed",
-      "description": "Earned ₹1920 (80% from CPM ₹250 for 12,000 views, Platform Commission ₹480)",
-      "createdAt": "2026-07-01T18:08:12.308Z"
-    },
-    {
-      "id": "dep-tx-test-order-g1x0e",
-      "userId": "test-creator-4amko",
-      "type": "deposit",
-      "amount": 2000,
-      "status": "Completed",
-      "description": "Funded via Razorpay Payment Gateway",
-      "createdAt": "2026-07-23T11:47:56.762Z"
-    },
-    {
-      "id": "tx-payout-comp-test-payout-hfua7",
-      "userId": "test-clipper-svbdo",
-      "type": "withdrawal",
-      "amount": 500,
-      "status": "Completed",
-      "description": "Withdrawn to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:47:56.792Z"
-    },
-    {
-      "id": "tx-payout-rev-payout-fail-37p9r",
-      "userId": "test-clipper-svbdo",
-      "type": "deposit",
-      "amount": 200,
-      "status": "Completed",
-      "description": "Withdrawn request failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T11:47:56.794Z"
-    },
-    {
-      "id": "dep-tx-test-order-qrwfx",
-      "userId": "test-creator-uv7on",
-      "type": "deposit",
-      "amount": 2000,
-      "status": "Completed",
-      "description": "Funded via Razorpay Payment Gateway",
-      "createdAt": "2026-07-23T11:49:53.966Z"
-    },
-    {
-      "id": "tx-payout-comp-test-payout-1v6t5",
-      "userId": "test-clipper-pfmp6",
-      "type": "withdrawal",
-      "amount": 500,
-      "status": "Completed",
-      "description": "Withdrawn to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:49:53.977Z"
-    },
-    {
-      "id": "tx-payout-rev-payout-fail-zdcfg",
-      "userId": "test-clipper-pfmp6",
-      "type": "deposit",
-      "amount": 200,
-      "status": "Completed",
-      "description": "Withdrawn request failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T11:49:53.978Z"
-    },
-    {
-      "id": "dep-tx-test-order-6vvaa",
-      "userId": "test-creator-01ipm",
-      "type": "deposit",
-      "amount": 2000,
-      "status": "Completed",
-      "description": "Funded via Razorpay Payment Gateway",
-      "createdAt": "2026-07-23T12:04:00.125Z"
-    },
-    {
-      "id": "tx-payout-comp-test-payout-1bou5",
-      "userId": "test-clipper-bs2gu",
-      "type": "withdrawal",
-      "amount": 500,
-      "status": "Completed",
-      "description": "Withdrawn to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:00.136Z"
-    },
-    {
-      "id": "tx-payout-rev-payout-fail-rovft",
-      "userId": "test-clipper-bs2gu",
-      "type": "deposit",
-      "amount": 200,
-      "status": "Completed",
-      "description": "Withdrawn request failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T12:04:00.137Z"
-    },
-    {
-      "id": "tx_dup_1",
-      "userId": "user_creator_rzp_dup",
+      "id": "tx-pay_captured_111",
+      "userId": "creator_webhook_tester",
       "type": "deposit",
       "amount": 500,
       "status": "Completed",
-      "description": "Funded via razorpay Payment Gateway",
-      "createdAt": "2026-07-23T12:04:00.907Z"
+      "description": "Funded via mock Payment Gateway",
+      "createdAt": "2026-07-23T12:41:48.272Z"
     },
     {
-      "id": "dep-tx-test-order-g6723",
-      "userId": "test-creator-bqizl",
+      "id": "tx-pay_paid_666",
+      "userId": "creator_webhook_tester",
       "type": "deposit",
-      "amount": 2000,
+      "amount": 300,
       "status": "Completed",
-      "description": "Funded via Razorpay Payment Gateway",
-      "createdAt": "2026-07-23T12:04:23.062Z"
+      "description": "Funded via mock Payment Gateway",
+      "createdAt": "2026-07-23T12:41:48.311Z"
     },
     {
-      "id": "tx-payout-comp-test-payout-c5x1s",
-      "userId": "test-clipper-w1lq1",
-      "type": "withdrawal",
-      "amount": 500,
-      "status": "Completed",
-      "description": "Withdrawn to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:23.073Z"
-    },
-    {
-      "id": "tx-payout-rev-payout-fail-xjv0w",
-      "userId": "test-clipper-w1lq1",
+      "id": "tx-pay_race_1212",
+      "userId": "creator_webhook_tester",
       "type": "deposit",
-      "amount": 200,
+      "amount": 1000,
       "status": "Completed",
-      "description": "Withdrawn request failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T12:04:23.077Z"
+      "description": "Funded via mock Payment Gateway",
+      "createdAt": "2026-07-23T12:41:48.348Z"
     },
     {
-      "id": "tx_dup_1",
-      "userId": "user_creator_rzp_dup",
+      "id": "tx-pay_persist_1414",
+      "userId": "creator_webhook_tester",
       "type": "deposit",
       "amount": 500,
       "status": "Completed",
-      "description": "Funded via razorpay Payment Gateway",
-      "createdAt": "2026-07-23T12:04:23.836Z"
+      "description": "Funded via mock Payment Gateway",
+      "createdAt": "2026-07-23T12:41:48.376Z"
+    },
+    {
+      "id": "tx-pay_concur_1515",
+      "userId": "creator_webhook_tester",
+      "type": "deposit",
+      "amount": 600,
+      "status": "Completed",
+      "description": "Funded via mock Payment Gateway",
+      "createdAt": "2026-07-23T12:41:48.391Z"
     }
   ],
   "payoutRequests": [
@@ -646,759 +871,371 @@
       "amount": 200,
       "status": "Failed",
       "createdAt": "2026-07-23T12:04:23.076Z"
+    },
+    {
+      "id": "test-payout-vu2hq",
+      "clipperId": "test-clipper-74dav",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T12:12:40.375Z"
+    },
+    {
+      "id": "payout-fail-w0c24",
+      "clipperId": "test-clipper-74dav",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T12:12:40.377Z"
+    },
+    {
+      "id": "test-payout-njc8w",
+      "clipperId": "test-clipper-z5fxt",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T12:28:59.322Z"
+    },
+    {
+      "id": "payout-fail-pelti",
+      "clipperId": "test-clipper-z5fxt",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T12:28:59.327Z"
+    },
+    {
+      "id": "test-payout-q79r9",
+      "clipperId": "test-clipper-aacqd",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T12:29:23.234Z"
+    },
+    {
+      "id": "payout-fail-lttw0",
+      "clipperId": "test-clipper-aacqd",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T12:29:23.239Z"
+    },
+    {
+      "id": "test-payout-1sw0o",
+      "clipperId": "test-clipper-r8oaw",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T12:30:24.640Z"
+    },
+    {
+      "id": "payout-fail-gnbwg",
+      "clipperId": "test-clipper-r8oaw",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T12:30:24.642Z"
+    },
+    {
+      "id": "test-payout-cyefx",
+      "clipperId": "test-clipper-mrana",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T12:41:46.706Z"
+    },
+    {
+      "id": "payout-fail-nfnw5",
+      "clipperId": "test-clipper-mrana",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T12:41:46.707Z"
     }
   ],
   "payments": [
     {
-      "id": "pay-rec-iu8vc",
-      "provider": "Razorpay",
-      "provider_order_id": "test-order-g1x0e",
-      "user_id": "test-creator-4amko",
-      "amount_paise": 200000,
-      "status": "paid",
-      "verification_attempts": 1,
-      "created_at": "2026-07-23T11:47:56.761Z",
-      "provider_payment_id": "test-payment-d23s5",
-      "paid_at": "2026-07-23T11:47:56.762Z"
-    },
-    {
-      "id": "pay-rec-bad",
-      "provider": "Razorpay",
-      "provider_order_id": "order-mismatch-yhbeh",
-      "user_id": "test-creator-4amko",
-      "amount_paise": 50000,
-      "status": "created",
-      "verification_attempts": 0,
-      "created_at": "2026-07-23T11:47:56.763Z"
-    },
-    {
-      "id": "pay-rec-kcynb",
-      "provider": "Razorpay",
-      "provider_order_id": "test-order-qrwfx",
-      "user_id": "test-creator-uv7on",
-      "amount_paise": 200000,
-      "currency": "INR",
-      "status": "paid",
-      "verification_attempts": 1,
-      "created_at": "2026-07-23T11:49:53.965Z",
-      "provider_payment_id": "test-payment-24oc2",
-      "paid_at": "2026-07-23T11:49:53.966Z"
-    },
-    {
-      "id": "pay-rec-bad",
-      "provider": "Razorpay",
-      "provider_order_id": "order-mismatch-bqsss",
-      "user_id": "test-creator-uv7on",
-      "amount_paise": 50000,
-      "currency": "INR",
-      "status": "created",
-      "verification_attempts": 0,
-      "created_at": "2026-07-23T11:49:53.968Z"
-    },
-    {
-      "id": "pay-rec-7kbyx",
-      "provider": "Razorpay",
-      "provider_order_id": "test-order-6vvaa",
-      "user_id": "test-creator-01ipm",
-      "amount_paise": 200000,
-      "currency": "INR",
-      "status": "paid",
-      "verification_attempts": 1,
-      "created_at": "2026-07-23T12:04:00.124Z",
-      "provider_payment_id": "test-payment-0c8n0",
-      "paid_at": "2026-07-23T12:04:00.125Z"
-    },
-    {
-      "id": "pay-rec-bad",
-      "provider": "Razorpay",
-      "provider_order_id": "order-mismatch-xxb6l",
-      "user_id": "test-creator-01ipm",
-      "amount_paise": 50000,
-      "currency": "INR",
-      "status": "created",
-      "verification_attempts": 0,
-      "created_at": "2026-07-23T12:04:00.127Z"
-    },
-    {
-      "id": "pay-rec-gitoj",
-      "provider": "Razorpay",
-      "provider_order_id": "test-order-g6723",
-      "user_id": "test-creator-bqizl",
-      "amount_paise": 200000,
-      "currency": "INR",
-      "status": "paid",
-      "verification_attempts": 1,
-      "created_at": "2026-07-23T12:04:23.060Z",
-      "provider_payment_id": "test-payment-9hxsu",
-      "paid_at": "2026-07-23T12:04:23.062Z"
-    },
-    {
-      "id": "pay-rec-bad",
-      "provider": "Razorpay",
-      "provider_order_id": "order-mismatch-308fn",
-      "user_id": "test-creator-bqizl",
-      "amount_paise": 50000,
-      "currency": "INR",
-      "status": "created",
-      "verification_attempts": 0,
-      "created_at": "2026-07-23T12:04:23.063Z"
-    },
-    {
-      "id": "pay_dup_rec_id",
-      "provider": "razorpay",
-      "provider_order_id": "order_rzp_dup_test",
-      "user_id": "user_creator_rzp_dup",
+      "id": "pay_rec_a9tf3",
+      "provider": "mock",
+      "provider_order_id": "order_capture_111",
+      "user_id": "creator_webhook_tester",
       "amount_paise": 50000,
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:04:23.835Z",
-      "provider_payment_id": "pay_rzp_id_dup",
-      "paid_at": "2026-07-23T12:04:23.836Z"
+      "created_at": "2026-07-23T12:41:48.229Z",
+      "provider_payment_id": "pay_captured_111",
+      "paid_at": "2026-07-23T12:41:48.271Z"
     },
     {
-      "id": "pay_mismatch_rec_id",
-      "provider": "razorpay",
-      "provider_order_id": "order_rzp_mismatch_test",
-      "user_id": "user_creator_rzp_mismatch",
+      "id": "pay_rec_pn6uh",
+      "provider": "mock",
+      "provider_order_id": "order_sig_222",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 10000,
+      "currency": "INR",
+      "status": "created",
+      "verification_attempts": 0,
+      "created_at": "2026-07-23T12:41:48.281Z"
+    },
+    {
+      "id": "pay_rec_35ro2",
+      "provider": "mock",
+      "provider_order_id": "order_fail_555",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 25000,
+      "currency": "INR",
+      "status": "failed",
+      "verification_attempts": 1,
+      "created_at": "2026-07-23T12:41:48.302Z",
+      "metadata": {
+        "failure_reason": "Card got declined by issuer"
+      }
+    },
+    {
+      "id": "pay_rec_jbnna",
+      "provider": "mock",
+      "provider_order_id": "order_paid_666",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 30000,
+      "currency": "INR",
+      "status": "paid",
+      "verification_attempts": 1,
+      "created_at": "2026-07-23T12:41:48.308Z",
+      "provider_payment_id": "pay_paid_666",
+      "paid_at": "2026-07-23T12:41:48.311Z"
+    },
+    {
+      "id": "pay_rec_84b5l",
+      "provider": "mock",
+      "provider_order_id": "order_mismatch_888",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 40000,
+      "currency": "INR",
+      "status": "created",
+      "verification_attempts": 0,
+      "created_at": "2026-07-23T12:41:48.317Z"
+    },
+    {
+      "id": "pay_rec_t2iwm",
+      "provider": "mock",
+      "provider_order_id": "order_currency_999",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 10000,
+      "currency": "INR",
+      "status": "created",
+      "verification_attempts": 0,
+      "created_at": "2026-07-23T12:41:48.326Z"
+    },
+    {
+      "id": "pay_rec_tv2p3",
+      "provider": "mock",
+      "provider_order_id": "order_reused_1010",
+      "user_id": "creator_webhook_tester",
       "amount_paise": 50000,
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:04:23.837Z"
+      "created_at": "2026-07-23T12:41:48.334Z"
     },
     {
-      "id": "pay_ownership_rec_id",
-      "provider": "razorpay",
-      "provider_order_id": "order_rzp_ownership_test",
-      "user_id": "owner_user",
-      "amount_paise": 50000,
+      "id": "pay_rec_4tc10",
+      "provider": "mock",
+      "provider_order_id": "order_race_1212",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 100000,
+      "currency": "INR",
+      "status": "paid",
+      "verification_attempts": 1,
+      "created_at": "2026-07-23T12:41:48.347Z",
+      "provider_payment_id": "pay_race_1212",
+      "paid_at": "2026-07-23T12:41:48.348Z"
+    },
+    {
+      "id": "pay_rec_76jna",
+      "provider": "mock",
+      "provider_order_id": "order_fail_1313",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 20000,
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:04:23.841Z"
+      "created_at": "2026-07-23T12:41:48.359Z"
     },
     {
-      "id": "pay_first_rec",
-      "provider": "razorpay",
-      "provider_order_id": "order_first_123",
-      "provider_payment_id": "pay_reused_123",
-      "user_id": "user_reused",
+      "id": "pay_rec_zgclg",
+      "provider": "mock",
+      "provider_order_id": "order_persist_1414",
+      "user_id": "creator_webhook_tester",
       "amount_paise": 50000,
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:04:23.842Z",
-      "paid_at": "2026-07-23T12:04:23.842Z"
+      "created_at": "2026-07-23T12:41:48.371Z",
+      "provider_payment_id": "pay_persist_1414",
+      "paid_at": "2026-07-23T12:41:48.376Z"
     },
     {
-      "id": "pay_second_rec",
-      "provider": "razorpay",
-      "provider_order_id": "order_second_456",
-      "user_id": "user_reused",
-      "amount_paise": 50000,
+      "id": "pay_rec_akp6z",
+      "provider": "mock",
+      "provider_order_id": "order_concur_1515",
+      "user_id": "creator_webhook_tester",
+      "amount_paise": 60000,
       "currency": "INR",
-      "status": "created",
-      "verification_attempts": 0,
-      "created_at": "2026-07-23T12:04:23.842Z"
+      "status": "paid",
+      "verification_attempts": 1,
+      "created_at": "2026-07-23T12:41:48.384Z",
+      "provider_payment_id": "pay_concur_1515",
+      "paid_at": "2026-07-23T12:41:48.391Z"
     }
   ],
   "financialLedger": [
     {
-      "id": "dep-led-test-order-g1x0e",
-      "referenceId": "dep-ref-test-order-g1x0e",
+      "id": "led-pay_captured_111",
+      "referenceId": "payment-verify-pay_captured_111",
       "referenceType": "deposit",
-      "fromAccount": "External (Razorpay)",
-      "toAccount": "creator_wallet:test-creator-4amko",
-      "userId": "test-creator-4amko",
-      "amount": 2000,
+      "fromAccount": "External (mock)",
+      "toAccount": "creator_wallet:creator_webhook_tester",
+      "userId": "creator_webhook_tester",
+      "amount": 500,
       "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: test-order-g1x0e, Payment ID: test-payment-d23s5)",
-      "createdAt": "2026-07-23T11:47:56.762Z"
+      "description": "Deposit via Payment Gateway (Order ID: order_capture_111, Payment ID: pay_captured_111)",
+      "createdAt": "2026-07-23T12:41:48.271Z"
     },
     {
-      "id": "lock-led-test-campaign-xggl1",
-      "referenceId": "lock-ref-test-campaign-xggl1",
-      "referenceType": "lockup",
-      "fromAccount": "creator_wallet:test-creator-4amko",
-      "toAccount": "campaign_escrow:test-campaign-xggl1",
-      "userId": "test-creator-4amko",
+      "id": "led-pay_paid_666",
+      "referenceId": "payment-verify-pay_paid_666",
+      "referenceType": "deposit",
+      "fromAccount": "External (mock)",
+      "toAccount": "creator_wallet:creator_webhook_tester",
+      "userId": "creator_webhook_tester",
+      "amount": 300,
+      "status": "completed",
+      "description": "Deposit via Payment Gateway (Order ID: order_paid_666, Payment ID: pay_paid_666)",
+      "createdAt": "2026-07-23T12:41:48.311Z"
+    },
+    {
+      "id": "led-pay_race_1212",
+      "referenceId": "payment-verify-pay_race_1212",
+      "referenceType": "deposit",
+      "fromAccount": "External (mock)",
+      "toAccount": "creator_wallet:creator_webhook_tester",
+      "userId": "creator_webhook_tester",
       "amount": 1000,
       "status": "completed",
-      "description": "Escrow lockup for campaign Test Database Integration Campaign",
-      "createdAt": "2026-07-23T11:47:56.764Z"
+      "description": "Deposit via Payment Gateway (Order ID: order_race_1212, Payment ID: pay_race_1212)",
+      "createdAt": "2026-07-23T12:41:48.348Z"
     },
     {
-      "id": "led-clip-batch-qo8yz",
-      "referenceId": "view-clipper-ref-test-sub-ucroq-batch-qo8yz",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-xggl1",
-      "toAccount": "clipper_earnings:test-clipper-svbdo",
-      "userId": "test-clipper-svbdo",
-      "amount": 320,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+2000 views)",
-      "createdAt": "2026-07-23T11:47:56.773Z"
-    },
-    {
-      "id": "led-plat-batch-qo8yz",
-      "referenceId": "view-platform-ref-test-sub-ucroq-batch-qo8yz",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-xggl1",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-svbdo",
-      "amount": 80,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T11:47:56.773Z"
-    },
-    {
-      "id": "led-clip-batch2-jcloe",
-      "referenceId": "view-clipper-ref-test-sub-ucroq-batch2-jcloe",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-xggl1",
-      "toAccount": "clipper_earnings:test-clipper-svbdo",
-      "userId": "test-clipper-svbdo",
-      "amount": 480,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+3000 views)",
-      "createdAt": "2026-07-23T11:47:56.774Z"
-    },
-    {
-      "id": "led-plat-batch2-jcloe",
-      "referenceId": "view-platform-ref-test-sub-ucroq-batch2-jcloe",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-xggl1",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-svbdo",
-      "amount": 120,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T11:47:56.774Z"
-    },
-    {
-      "id": "led-payout-test-payout-hfua7",
-      "referenceId": "payout-request-test-payout-hfua7",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-svbdo",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-svbdo",
-      "userId": "test-clipper-svbdo",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:47:56.778Z"
-    },
-    {
-      "id": "led-payout-comp-test-payout-hfua7",
-      "referenceId": "payout-complete-test-payout-hfua7",
-      "referenceType": "withdrawal_completed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-svbdo",
-      "toAccount": "External (UPI)",
-      "userId": "test-clipper-svbdo",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal completed to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:47:56.792Z"
-    },
-    {
-      "id": "led-payout-payout-fail-37p9r",
-      "referenceId": "payout-request-payout-fail-37p9r",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-svbdo",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-svbdo",
-      "userId": "test-clipper-svbdo",
-      "amount": 200,
-      "status": "reversed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:47:56.793Z"
-    },
-    {
-      "id": "led-payout-rev-payout-fail-37p9r",
-      "referenceId": "payout-failed-payout-fail-37p9r",
-      "referenceType": "withdrawal_failed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-svbdo",
-      "toAccount": "clipper_earnings:test-clipper-svbdo",
-      "userId": "test-clipper-svbdo",
-      "amount": 200,
-      "status": "completed",
-      "description": "Withdrawal failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T11:47:56.794Z"
-    },
-    {
-      "id": "dep-led-test-order-qrwfx",
-      "referenceId": "dep-ref-test-order-qrwfx",
+      "id": "led-pay_persist_1414",
+      "referenceId": "payment-verify-pay_persist_1414",
       "referenceType": "deposit",
-      "fromAccount": "External (Razorpay)",
-      "toAccount": "creator_wallet:test-creator-uv7on",
-      "userId": "test-creator-uv7on",
-      "amount": 2000,
-      "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: test-order-qrwfx, Payment ID: test-payment-24oc2)",
-      "createdAt": "2026-07-23T11:49:53.966Z"
-    },
-    {
-      "id": "lock-led-test-campaign-6z8gb",
-      "referenceId": "lock-ref-test-campaign-6z8gb",
-      "referenceType": "escrow_lock",
-      "fromAccount": "creator_wallet:test-creator-uv7on",
-      "toAccount": "campaign_escrow:test-campaign-6z8gb",
-      "userId": "test-creator-uv7on",
-      "amount": 1000,
-      "status": "completed",
-      "description": "Escrow lockup for campaign Test Database Integration Campaign",
-      "createdAt": "2026-07-23T11:49:53.969Z"
-    },
-    {
-      "id": "led-clip-batch-d5wf1",
-      "referenceId": "view-clipper-ref-test-sub-9guiz-batch-d5wf1",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-6z8gb",
-      "toAccount": "clipper_earnings:test-clipper-pfmp6",
-      "userId": "test-clipper-pfmp6",
-      "amount": 320,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+2000 views)",
-      "createdAt": "2026-07-23T11:49:53.972Z"
-    },
-    {
-      "id": "led-plat-batch-d5wf1",
-      "referenceId": "view-platform-ref-test-sub-9guiz-batch-d5wf1",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-6z8gb",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-pfmp6",
-      "amount": 80,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T11:49:53.972Z"
-    },
-    {
-      "id": "led-clip-batch2-g7ova",
-      "referenceId": "view-clipper-ref-test-sub-9guiz-batch2-g7ova",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-6z8gb",
-      "toAccount": "clipper_earnings:test-clipper-pfmp6",
-      "userId": "test-clipper-pfmp6",
-      "amount": 480,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+3000 views)",
-      "createdAt": "2026-07-23T11:49:53.973Z"
-    },
-    {
-      "id": "led-plat-batch2-g7ova",
-      "referenceId": "view-platform-ref-test-sub-9guiz-batch2-g7ova",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-6z8gb",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-pfmp6",
-      "amount": 120,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T11:49:53.973Z"
-    },
-    {
-      "id": "led-payout-test-payout-1v6t5",
-      "referenceId": "payout-request-test-payout-1v6t5",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-pfmp6",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-pfmp6",
-      "userId": "test-clipper-pfmp6",
+      "fromAccount": "External (mock)",
+      "toAccount": "creator_wallet:creator_webhook_tester",
+      "userId": "creator_webhook_tester",
       "amount": 500,
       "status": "completed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:49:53.976Z"
+      "description": "Deposit via Payment Gateway (Order ID: order_persist_1414, Payment ID: pay_persist_1414)",
+      "createdAt": "2026-07-23T12:41:48.376Z"
     },
     {
-      "id": "led-payout-comp-test-payout-1v6t5",
-      "referenceId": "payout-complete-test-payout-1v6t5",
-      "referenceType": "withdrawal_completed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-pfmp6",
-      "toAccount": "External (UPI)",
-      "userId": "test-clipper-pfmp6",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal completed to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:49:53.977Z"
-    },
-    {
-      "id": "led-payout-payout-fail-zdcfg",
-      "referenceId": "payout-request-payout-fail-zdcfg",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-pfmp6",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-pfmp6",
-      "userId": "test-clipper-pfmp6",
-      "amount": 200,
-      "status": "reversed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T11:49:53.978Z"
-    },
-    {
-      "id": "led-payout-rev-payout-fail-zdcfg",
-      "referenceId": "payout-failed-payout-fail-zdcfg",
-      "referenceType": "withdrawal_failed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-pfmp6",
-      "toAccount": "clipper_earnings:test-clipper-pfmp6",
-      "userId": "test-clipper-pfmp6",
-      "amount": 200,
-      "status": "completed",
-      "description": "Withdrawal failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T11:49:53.978Z"
-    },
-    {
-      "id": "dep-led-test-order-6vvaa",
-      "referenceId": "dep-ref-test-order-6vvaa",
+      "id": "led-pay_concur_1515",
+      "referenceId": "payment-verify-pay_concur_1515",
       "referenceType": "deposit",
-      "fromAccount": "External (Razorpay)",
-      "toAccount": "creator_wallet:test-creator-01ipm",
-      "userId": "test-creator-01ipm",
-      "amount": 2000,
+      "fromAccount": "External (mock)",
+      "toAccount": "creator_wallet:creator_webhook_tester",
+      "userId": "creator_webhook_tester",
+      "amount": 600,
       "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: test-order-6vvaa, Payment ID: test-payment-0c8n0)",
-      "createdAt": "2026-07-23T12:04:00.125Z"
-    },
-    {
-      "id": "lock-led-test-campaign-9em1z",
-      "referenceId": "lock-ref-test-campaign-9em1z",
-      "referenceType": "escrow_lock",
-      "fromAccount": "creator_wallet:test-creator-01ipm",
-      "toAccount": "campaign_escrow:test-campaign-9em1z",
-      "userId": "test-creator-01ipm",
-      "amount": 1000,
-      "status": "completed",
-      "description": "Escrow lockup for campaign Test Database Integration Campaign",
-      "createdAt": "2026-07-23T12:04:00.128Z"
-    },
-    {
-      "id": "led-clip-batch-e3fx2",
-      "referenceId": "view-clipper-ref-test-sub-ncgth-batch-e3fx2",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-9em1z",
-      "toAccount": "clipper_earnings:test-clipper-bs2gu",
-      "userId": "test-clipper-bs2gu",
-      "amount": 320,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+2000 views)",
-      "createdAt": "2026-07-23T12:04:00.132Z"
-    },
-    {
-      "id": "led-plat-batch-e3fx2",
-      "referenceId": "view-platform-ref-test-sub-ncgth-batch-e3fx2",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-9em1z",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-bs2gu",
-      "amount": 80,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T12:04:00.132Z"
-    },
-    {
-      "id": "led-clip-batch2-y8pg5",
-      "referenceId": "view-clipper-ref-test-sub-ncgth-batch2-y8pg5",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-9em1z",
-      "toAccount": "clipper_earnings:test-clipper-bs2gu",
-      "userId": "test-clipper-bs2gu",
-      "amount": 480,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+3000 views)",
-      "createdAt": "2026-07-23T12:04:00.133Z"
-    },
-    {
-      "id": "led-plat-batch2-y8pg5",
-      "referenceId": "view-platform-ref-test-sub-ncgth-batch2-y8pg5",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-9em1z",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-bs2gu",
-      "amount": 120,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T12:04:00.133Z"
-    },
-    {
-      "id": "led-payout-test-payout-1bou5",
-      "referenceId": "payout-request-test-payout-1bou5",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-bs2gu",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-bs2gu",
-      "userId": "test-clipper-bs2gu",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:00.135Z"
-    },
-    {
-      "id": "led-payout-comp-test-payout-1bou5",
-      "referenceId": "payout-complete-test-payout-1bou5",
-      "referenceType": "withdrawal_completed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-bs2gu",
-      "toAccount": "External (UPI)",
-      "userId": "test-clipper-bs2gu",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal completed to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:00.136Z"
-    },
-    {
-      "id": "led-payout-payout-fail-rovft",
-      "referenceId": "payout-request-payout-fail-rovft",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-bs2gu",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-bs2gu",
-      "userId": "test-clipper-bs2gu",
-      "amount": 200,
-      "status": "reversed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:00.136Z"
-    },
-    {
-      "id": "led-payout-rev-payout-fail-rovft",
-      "referenceId": "payout-failed-payout-fail-rovft",
-      "referenceType": "withdrawal_failed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-bs2gu",
-      "toAccount": "clipper_earnings:test-clipper-bs2gu",
-      "userId": "test-clipper-bs2gu",
-      "amount": 200,
-      "status": "completed",
-      "description": "Withdrawal failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T12:04:00.137Z"
-    },
-    {
-      "id": "led_dup_1",
-      "referenceId": "ref_dup_1",
-      "referenceType": "deposit",
-      "fromAccount": "External (razorpay)",
-      "toAccount": "creator_wallet:user_creator_rzp_dup",
-      "userId": "user_creator_rzp_dup",
-      "amount": 500,
-      "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: order_rzp_dup_test, Payment ID: pay_rzp_id_dup)",
-      "createdAt": "2026-07-23T12:04:00.907Z"
-    },
-    {
-      "id": "dep-led-test-order-g6723",
-      "referenceId": "dep-ref-test-order-g6723",
-      "referenceType": "deposit",
-      "fromAccount": "External (Razorpay)",
-      "toAccount": "creator_wallet:test-creator-bqizl",
-      "userId": "test-creator-bqizl",
-      "amount": 2000,
-      "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: test-order-g6723, Payment ID: test-payment-9hxsu)",
-      "createdAt": "2026-07-23T12:04:23.062Z"
-    },
-    {
-      "id": "lock-led-test-campaign-8gec2",
-      "referenceId": "lock-ref-test-campaign-8gec2",
-      "referenceType": "escrow_lock",
-      "fromAccount": "creator_wallet:test-creator-bqizl",
-      "toAccount": "campaign_escrow:test-campaign-8gec2",
-      "userId": "test-creator-bqizl",
-      "amount": 1000,
-      "status": "completed",
-      "description": "Escrow lockup for campaign Test Database Integration Campaign",
-      "createdAt": "2026-07-23T12:04:23.066Z"
-    },
-    {
-      "id": "led-clip-batch-ppocn",
-      "referenceId": "view-clipper-ref-test-sub-6adih-batch-ppocn",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-8gec2",
-      "toAccount": "clipper_earnings:test-clipper-w1lq1",
-      "userId": "test-clipper-w1lq1",
-      "amount": 320,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+2000 views)",
-      "createdAt": "2026-07-23T12:04:23.069Z"
-    },
-    {
-      "id": "led-plat-batch-ppocn",
-      "referenceId": "view-platform-ref-test-sub-6adih-batch-ppocn",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-8gec2",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-w1lq1",
-      "amount": 80,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T12:04:23.069Z"
-    },
-    {
-      "id": "led-clip-batch2-wxpn1",
-      "referenceId": "view-clipper-ref-test-sub-6adih-batch2-wxpn1",
-      "referenceType": "clipper_earning",
-      "fromAccount": "campaign_escrow:test-campaign-8gec2",
-      "toAccount": "clipper_earnings:test-clipper-w1lq1",
-      "userId": "test-clipper-w1lq1",
-      "amount": 480,
-      "status": "completed",
-      "description": "Payout for Test Clipper DB views (+3000 views)",
-      "createdAt": "2026-07-23T12:04:23.070Z"
-    },
-    {
-      "id": "led-plat-batch2-wxpn1",
-      "referenceId": "view-platform-ref-test-sub-6adih-batch2-wxpn1",
-      "referenceType": "platform_fee",
-      "fromAccount": "campaign_escrow:test-campaign-8gec2",
-      "toAccount": "QUOR Platform",
-      "userId": "test-clipper-w1lq1",
-      "amount": 120,
-      "status": "completed",
-      "description": "Platform commission 20% for Test Clipper DB views",
-      "createdAt": "2026-07-23T12:04:23.070Z"
-    },
-    {
-      "id": "led-payout-test-payout-c5x1s",
-      "referenceId": "payout-request-test-payout-c5x1s",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-w1lq1",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-w1lq1",
-      "userId": "test-clipper-w1lq1",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:23.072Z"
-    },
-    {
-      "id": "led-payout-comp-test-payout-c5x1s",
-      "referenceId": "payout-complete-test-payout-c5x1s",
-      "referenceType": "withdrawal_completed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-w1lq1",
-      "toAccount": "External (UPI)",
-      "userId": "test-clipper-w1lq1",
-      "amount": 500,
-      "status": "completed",
-      "description": "Withdrawal completed to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:23.073Z"
-    },
-    {
-      "id": "led-payout-payout-fail-xjv0w",
-      "referenceId": "payout-request-payout-fail-xjv0w",
-      "referenceType": "withdrawal_request",
-      "fromAccount": "clipper_earnings:test-clipper-w1lq1",
-      "toAccount": "clipper_pending_withdrawal:test-clipper-w1lq1",
-      "userId": "test-clipper-w1lq1",
-      "amount": 200,
-      "status": "reversed",
-      "description": "Withdrawal request to UPI: testclipper@okupi",
-      "createdAt": "2026-07-23T12:04:23.076Z"
-    },
-    {
-      "id": "led-payout-rev-payout-fail-xjv0w",
-      "referenceId": "payout-failed-payout-fail-xjv0w",
-      "referenceType": "withdrawal_failed",
-      "fromAccount": "clipper_pending_withdrawal:test-clipper-w1lq1",
-      "toAccount": "clipper_earnings:test-clipper-w1lq1",
-      "userId": "test-clipper-w1lq1",
-      "amount": 200,
-      "status": "completed",
-      "description": "Withdrawal failed. Refunded to available balance.",
-      "createdAt": "2026-07-23T12:04:23.077Z"
-    },
-    {
-      "id": "led_dup_1",
-      "referenceId": "ref_dup_1",
-      "referenceType": "deposit",
-      "fromAccount": "External (razorpay)",
-      "toAccount": "creator_wallet:user_creator_rzp_dup",
-      "userId": "user_creator_rzp_dup",
-      "amount": 500,
-      "status": "completed",
-      "description": "Deposit via Payment Gateway (Order ID: order_rzp_dup_test, Payment ID: pay_rzp_id_dup)",
-      "createdAt": "2026-07-23T12:04:23.836Z"
+      "description": "Deposit via Payment Gateway (Order ID: order_concur_1515, Payment ID: pay_concur_1515)",
+      "createdAt": "2026-07-23T12:41:48.391Z"
     }
   ],
   "auditEvents": [
     {
-      "id": "dep-aud-test-order-g1x0e",
-      "actorUserId": "test-creator-4amko",
+      "id": "aud-pay_captured_111",
+      "actorUserId": "creator_webhook_tester",
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay-rec-iu8vc",
-      "metadata": {
-        "amountPaise": 200000,
-        "orderId": "test-order-g1x0e",
-        "paymentId": "test-payment-d23s5",
-        "provider": "Razorpay"
-      },
-      "createdAt": "2026-07-23T11:47:56.762Z"
-    },
-    {
-      "id": "dep-aud-test-order-qrwfx",
-      "actorUserId": "test-creator-uv7on",
-      "actorRole": "creator",
-      "action": "PAYMENT_DEPOSIT_SUCCESS",
-      "entityType": "payment",
-      "entityId": "pay-rec-kcynb",
-      "metadata": {
-        "amountPaise": 200000,
-        "orderId": "test-order-qrwfx",
-        "paymentId": "test-payment-24oc2",
-        "provider": "Razorpay"
-      },
-      "createdAt": "2026-07-23T11:49:53.966Z"
-    },
-    {
-      "id": "dep-aud-test-order-6vvaa",
-      "actorUserId": "test-creator-01ipm",
-      "actorRole": "creator",
-      "action": "PAYMENT_DEPOSIT_SUCCESS",
-      "entityType": "payment",
-      "entityId": "pay-rec-7kbyx",
-      "metadata": {
-        "amountPaise": 200000,
-        "orderId": "test-order-6vvaa",
-        "paymentId": "test-payment-0c8n0",
-        "provider": "Razorpay"
-      },
-      "createdAt": "2026-07-23T12:04:00.125Z"
-    },
-    {
-      "id": "aud_dup_1",
-      "actorUserId": "user_creator_rzp_dup",
-      "actorRole": "creator",
-      "action": "PAYMENT_DEPOSIT_SUCCESS",
-      "entityType": "payment",
-      "entityId": "pay_dup_rec_id",
+      "entityId": "pay_rec_a9tf3",
       "metadata": {
         "amountPaise": 50000,
-        "orderId": "order_rzp_dup_test",
-        "paymentId": "pay_rzp_id_dup",
-        "provider": "razorpay"
+        "orderId": "order_capture_111",
+        "paymentId": "pay_captured_111",
+        "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:04:00.907Z"
+      "createdAt": "2026-07-23T12:41:48.272Z"
     },
     {
-      "id": "dep-aud-test-order-g6723",
-      "actorUserId": "test-creator-bqizl",
+      "id": "aud-pay_paid_666",
+      "actorUserId": "creator_webhook_tester",
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay-rec-gitoj",
+      "entityId": "pay_rec_jbnna",
       "metadata": {
-        "amountPaise": 200000,
-        "orderId": "test-order-g6723",
-        "paymentId": "test-payment-9hxsu",
-        "provider": "Razorpay"
+        "amountPaise": 30000,
+        "orderId": "order_paid_666",
+        "paymentId": "pay_paid_666",
+        "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:04:23.062Z"
+      "createdAt": "2026-07-23T12:41:48.311Z"
     },
     {
-      "id": "aud_dup_1",
-      "actorUserId": "user_creator_rzp_dup",
+      "id": "aud-pay_race_1212",
+      "actorUserId": "creator_webhook_tester",
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_dup_rec_id",
+      "entityId": "pay_rec_4tc10",
+      "metadata": {
+        "amountPaise": 100000,
+        "orderId": "order_race_1212",
+        "paymentId": "pay_race_1212",
+        "provider": "mock"
+      },
+      "createdAt": "2026-07-23T12:41:48.348Z"
+    },
+    {
+      "id": "aud-pay_persist_1414",
+      "actorUserId": "creator_webhook_tester",
+      "actorRole": "creator",
+      "action": "PAYMENT_DEPOSIT_SUCCESS",
+      "entityType": "payment",
+      "entityId": "pay_rec_zgclg",
       "metadata": {
         "amountPaise": 50000,
-        "orderId": "order_rzp_dup_test",
-        "paymentId": "pay_rzp_id_dup",
-        "provider": "razorpay"
+        "orderId": "order_persist_1414",
+        "paymentId": "pay_persist_1414",
+        "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:04:23.836Z"
+      "createdAt": "2026-07-23T12:41:48.376Z"
+    },
+    {
+      "id": "aud-pay_concur_1515",
+      "actorUserId": "creator_webhook_tester",
+      "actorRole": "creator",
+      "action": "PAYMENT_DEPOSIT_SUCCESS",
+      "entityType": "payment",
+      "entityId": "pay_rec_akp6z",
+      "metadata": {
+        "amountPaise": 60000,
+        "orderId": "order_concur_1515",
+        "paymentId": "pay_concur_1515",
+        "provider": "mock"
+      },
+      "createdAt": "2026-07-23T12:41:48.391Z"
     }
   ],
   "viewPayoutEvents": [
@@ -1481,6 +1318,275 @@
       "clipperAmount": 480,
       "platformAmount": 120,
       "processedAt": "2026-07-23T12:04:23.070Z"
+    },
+    {
+      "submissionId": "test-sub-nq4yh",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T12:12:40.369Z"
+    },
+    {
+      "submissionId": "test-sub-nq4yh",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T12:12:40.370Z"
+    },
+    {
+      "submissionId": "test-sub-d8g8u",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T12:28:59.312Z"
+    },
+    {
+      "submissionId": "test-sub-d8g8u",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T12:28:59.318Z"
+    },
+    {
+      "submissionId": "test-sub-cs4se",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T12:29:23.224Z"
+    },
+    {
+      "submissionId": "test-sub-cs4se",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T12:29:23.230Z"
+    },
+    {
+      "submissionId": "test-sub-373vb",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T12:30:24.637Z"
+    },
+    {
+      "submissionId": "test-sub-373vb",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T12:30:24.639Z"
+    },
+    {
+      "submissionId": "test-sub-5s97v",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T12:41:46.703Z"
+    },
+    {
+      "submissionId": "test-sub-5s97v",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T12:41:46.705Z"
+    }
+  ],
+  "webhookEvents": [
+    {
+      "id": "evt_1",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.270Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_capture_111",
+        "paymentId": "pay_captured_111",
+        "amountPaise": 50000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.272Z"
+    },
+    {
+      "id": "evt_5",
+      "provider": "razorpay",
+      "event_type": "payment.failed",
+      "received_at": "2026-07-23T12:41:48.306Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_fail_555",
+        "paymentId": "pay_failed_555",
+        "amountPaise": 25000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.307Z"
+    },
+    {
+      "id": "evt_6",
+      "provider": "razorpay",
+      "event_type": "order.paid",
+      "received_at": "2026-07-23T12:41:48.310Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_paid_666",
+        "paymentId": "pay_paid_666",
+        "amountPaise": 30000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.311Z"
+    },
+    {
+      "id": "evt_7",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.316Z",
+      "processing_status": "failed",
+      "payload": {
+        "orderId": "order_unknown_777",
+        "paymentId": "pay_unknown_777",
+        "amountPaise": 50000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.316Z"
+    },
+    {
+      "id": "evt_8",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.322Z",
+      "processing_status": "failed",
+      "payload": {
+        "orderId": "order_mismatch_888",
+        "paymentId": "pay_mismatch_888",
+        "amountPaise": 10000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.323Z"
+    },
+    {
+      "id": "evt_9",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.331Z",
+      "processing_status": "failed",
+      "payload": {
+        "orderId": "order_currency_999",
+        "paymentId": "pay_currency_999",
+        "amountPaise": 10000,
+        "currency": "USD"
+      },
+      "processed_at": "2026-07-23T12:41:48.332Z"
+    },
+    {
+      "id": "evt_10",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.338Z",
+      "processing_status": "failed",
+      "payload": {
+        "orderId": "order_reused_1010",
+        "paymentId": "pay_captured_111",
+        "amountPaise": 50000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.339Z"
+    },
+    {
+      "id": "evt_11_fail",
+      "provider": "razorpay",
+      "event_type": "payment.failed",
+      "received_at": "2026-07-23T12:41:48.344Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_capture_111",
+        "paymentId": "new_pay_id_11",
+        "amountPaise": 50000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.345Z"
+    },
+    {
+      "id": "evt_12",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.357Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_race_1212",
+        "paymentId": "pay_race_1212",
+        "amountPaise": 100000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.358Z"
+    },
+    {
+      "id": "evt_13",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.362Z",
+      "processing_status": "received",
+      "payload": {
+        "orderId": "order_fail_1313",
+        "paymentId": "pay_fail_1313",
+        "amountPaise": 20000,
+        "currency": "INR"
+      }
+    },
+    {
+      "id": "evt_14",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.375Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_persist_1414",
+        "paymentId": "pay_persist_1414",
+        "amountPaise": 50000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.376Z"
+    },
+    {
+      "id": "evt_concur_1515",
+      "provider": "razorpay",
+      "event_type": "payment.captured",
+      "received_at": "2026-07-23T12:41:48.390Z",
+      "processing_status": "processed",
+      "payload": {
+        "orderId": "order_concur_1515",
+        "paymentId": "pay_concur_1515",
+        "amountPaise": 60000,
+        "currency": "INR"
+      },
+      "processed_at": "2026-07-23T12:41:48.392Z"
     }
   ]
 }

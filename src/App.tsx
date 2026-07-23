@@ -326,24 +326,148 @@ export default function App() {
     if (!user || user.role !== "creator") return;
     try {
       setDepositing(true);
-      const res = await fetch(`${API_BASE}/api/creator/wallet/deposit`, {
+      const amountPaise = Math.round(Number(depositAmount) * 100);
+
+      if (amountPaise < 100) {
+        showToast("Minimum deposit is ₹1 (100 paise)", "error");
+        setDepositing(false);
+        return;
+      }
+
+      // 1. Create order on backend
+      const orderRes = await fetch(`${API_BASE}/api/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeader()
         },
-        body: JSON.stringify({ amount: Number(depositAmount) })
+        body: JSON.stringify({ amount: amountPaise, currency: "INR" })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Deposit failed");
       
-      setCreatorProfile(prev => prev ? { ...prev, walletBalance: data.balance } : null);
-      showToast(`Success! Deposited ₹${depositAmount} securely into escrow wallet.`, "success");
-      setShowDepositModal(false);
-      fetchPlatformStats();
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(orderData.error || "Failed to create payment order");
+      }
+
+      const orderId = orderData.order_id;
+
+      // If it is a mock order (starts with order_mock_) or we are in mock mode:
+      if (orderId && orderId.startsWith("order_mock_")) {
+        showToast("Mock provider detected. Simulating successful Razorpay payment...", "success");
+        
+        // Call verification endpoint with mock signature
+        const verifyRes = await fetch(`${API_BASE}/api/verify-payment`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeader()
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            payment_id: "pay_mock_" + Math.random().toString(36).substring(2, 9),
+            razorpay_signature: "signature_mock_success"
+          })
+        });
+
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok) {
+          throw new Error(verifyData.error || "Failed to verify payment");
+        }
+
+        // Fetch updated profile
+        const profileRes = await fetch(`${API_BASE}/api/creator/profile`, {
+          headers: { ...getAuthHeader() }
+        });
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setCreatorProfile(profileData.profile);
+        }
+
+        showToast(`Success! Deposited ₹${depositAmount} securely into escrow wallet (Mock).`, "success");
+        setShowDepositModal(false);
+        fetchPlatformStats();
+        return;
+      }
+
+      // 2. Open Razorpay checkout modal
+      const keyId = (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || "rzp_test_TGwV4IG0QQsWn0";
+      
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay SDK not loaded. Please check your internet connection.");
+      }
+
+      const options = {
+        key: keyId,
+        amount: orderData.amount,
+        currency: orderData.currency || "INR",
+        name: "QUOR Escrow",
+        description: "Escrow wallet deposit",
+        order_id: orderId,
+        handler: async function (response: any) {
+          try {
+            setDepositing(true);
+            // On success: receive razorpay_payment_id, razorpay_order_id, razorpay_signature
+            const verifyRes = await fetch(`${API_BASE}/api/verify-payment`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeader()
+              },
+              body: JSON.stringify({
+                order_id: response.razorpay_order_id,
+                payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.error || "Failed to verify payment");
+            }
+
+            // Fetch updated profile
+            const profileRes = await fetch(`${API_BASE}/api/creator/profile`, {
+              headers: { ...getAuthHeader() }
+            });
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              setCreatorProfile(profileData.profile);
+            }
+
+            showToast(`Success! Deposited ₹${depositAmount} securely into escrow wallet.`, "success");
+            setShowDepositModal(false);
+            fetchPlatformStats();
+          } catch (err: any) {
+            showToast(err?.message || "Verification failed", "error");
+          } finally {
+            setDepositing(false);
+          }
+        },
+        prefill: {
+          name: user.name || "Creator",
+          email: user.email || "",
+        },
+        theme: {
+          color: "#06b6d4"
+        },
+        modal: {
+          ondismiss: function () {
+            showToast("Payment modal closed by user.", "error");
+            setDepositing(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      
+      rzp.on("payment.failed", function (response: any) {
+        showToast(`Payment failed: ${response.error.description}`, "error");
+        setDepositing(false);
+      });
+
+      rzp.open();
     } catch (err: any) {
       showToast(err?.message || "Deposit transaction rejected.", "error");
-    } finally {
       setDepositing(false);
     }
   };

@@ -185,6 +185,17 @@ CREATE TABLE IF NOT EXISTS trov_state (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 15. WEBHOOK EVENTS TABLE
+CREATE TABLE IF NOT EXISTS webhook_events (
+    id VARCHAR(255) PRIMARY KEY,
+    provider VARCHAR(50) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMPTZ DEFAULT NULL,
+    processing_status VARCHAR(50) NOT NULL DEFAULT 'received' CHECK (processing_status IN ('received', 'processed', 'failed')),
+    payload JSONB DEFAULT NULL
+);
+
 
 -- ==========================================
 -- INDEXES FOR HIGH-PERFORMANCE QUERYING
@@ -202,6 +213,7 @@ CREATE INDEX IF NOT EXISTS idx_payout_requests_status ON payout_requests(status)
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(provider_order_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_ref_id ON financial_ledger(reference_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON financial_ledger(user_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_provider_id ON webhook_events(provider, id);
 
 
 -- ==========================================
