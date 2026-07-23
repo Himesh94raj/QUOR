@@ -1548,57 +1548,7 @@ const startServer = async () => {
 
   // Wallet and Deposits
   app.post("/api/creator/wallet/deposit", authenticateUser, (req: any, res) => {
-    const parsed = walletDepositSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.issues[0].message });
-    }
-    const amount = typeof parsed.data.amount === "number" ? parsed.data.amount : parseFloat(parsed.data.amount);
-    const paymentId = req.body.paymentId || Math.random().toString(36).substring(2, 9);
-    const refId = `deposit-${paymentId}`;
-
-    const db = loadDb();
-
-    // Idempotency check
-    if (db.financialLedger) {
-      const existing = db.financialLedger.find(e => e.referenceId === refId);
-      if (existing) {
-        const profile = db.creatorProfiles[req.user.id] || { userId: req.user.id, channelUrl: "", walletBalance: 0 };
-        return res.json({ message: "Wallet successfully funded (idempotent).", balance: profile.walletBalance });
-      }
-    }
-
-    let profile = db.creatorProfiles[req.user.id];
-    if (!profile) {
-      profile = { userId: req.user.id, channelUrl: "", walletBalance: 0 };
-      db.creatorProfiles[req.user.id] = profile;
-    }
-
-    profile.walletBalance = Math.round((profile.walletBalance + amount) * 100) / 100;
-
-    const ledgerEntry = recordLedgerEntry(db, {
-      referenceId: refId,
-      referenceType: "deposit",
-      fromAccount: "External (Razorpay)",
-      toAccount: `creator_wallet:${req.user.id}`,
-      userId: req.user.id,
-      amount,
-      status: "completed",
-      description: `Fund Added via Razorpay (Payment ID: ${paymentId})`
-    });
-
-    const transaction: WalletTransaction = {
-      id: "tx-" + paymentId,
-      userId: req.user.id,
-      type: "deposit",
-      amount: amount,
-      status: "Completed",
-      description: `Fund Added via Razorpay Payment Gateway (UPI ID Simulation)`,
-      createdAt: ledgerEntry.createdAt
-    };
-
-    db.walletHistory.push(transaction);
-    saveDb(db);
-    res.json({ message: "Wallet successfully funded.", balance: profile.walletBalance, transaction });
+    return res.status(400).json({ error: "Direct wallet credits are disabled for security. Please use the secure Razorpay Standard Checkout flow." });
   });
 
   app.get("/api/wallet/history", authenticateUser, (req: any, res) => {

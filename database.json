@@ -217,6 +217,24 @@
       "role": "clipper",
       "status": "active",
       "createdAt": "2026-07-23T12:41:46.690Z"
+    },
+    {
+      "id": "test-creator-vx9cb",
+      "name": "Test Creator DB",
+      "email": "test-creator-vx9cb@creator.com",
+      "password": "hashed_password_123",
+      "role": "creator",
+      "status": "active",
+      "createdAt": "2026-07-23T13:01:59.863Z"
+    },
+    {
+      "id": "test-clipper-iqd1n",
+      "name": "Test Clipper DB",
+      "email": "test-clipper-iqd1n@clipper.com",
+      "password": "hashed_password_123",
+      "role": "clipper",
+      "status": "active",
+      "createdAt": "2026-07-23T13:01:59.864Z"
     }
   ],
   "clipperProfiles": {
@@ -326,6 +344,16 @@
       "kycDocUrl": "https://example.com/doc",
       "kycAadhaar": "1234 5678 9012",
       "kycPan": "ABCDE1234F"
+    },
+    "test-clipper-iqd1n": {
+      "userId": "test-clipper-iqd1n",
+      "upiId": "testclipper@okupi",
+      "instagramHandle": "test_clips",
+      "youtubeHandle": "test_yt",
+      "kycStatus": "Verified",
+      "kycDocUrl": "https://example.com/doc",
+      "kycAadhaar": "1234 5678 9012",
+      "kycPan": "ABCDE1234F"
     }
   },
   "creatorProfiles": {
@@ -403,6 +431,16 @@
       "userId": "test-creator-wuzoj",
       "channelUrl": "https://youtube.com/test",
       "walletBalance": 1000
+    },
+    "test-creator-vx9cb": {
+      "userId": "test-creator-vx9cb",
+      "channelUrl": "https://youtube.com/test",
+      "walletBalance": 1000
+    },
+    "user_valid_owner": {
+      "userId": "user_valid_owner",
+      "channelUrl": "",
+      "walletBalance": 600
     }
   },
   "campaigns": [
@@ -599,6 +637,24 @@
       "status": "Active",
       "campaignType": "clipping",
       "createdAt": "2026-07-23T12:41:46.698Z"
+    },
+    {
+      "id": "test-campaign-i8104",
+      "creatorId": "test-creator-vx9cb",
+      "creatorName": "Test Creator DB",
+      "title": "Test Database Integration Campaign",
+      "sourceVideoUrl": "https://youtube.com/shorts/test",
+      "cpm": 200,
+      "budget": 1000,
+      "spent": 1000,
+      "escrowBalance": 0,
+      "instructions": "Clip the best parts.",
+      "platform": "youtube",
+      "minDuration": 20,
+      "deadline": "2026-07-28T13:01:59.872Z",
+      "status": "Active",
+      "campaignType": "clipping",
+      "createdAt": "2026-07-23T13:01:59.872Z"
     }
   ],
   "submissions": [
@@ -741,6 +797,19 @@
       "approvedAt": "2026-07-23T12:41:46.702Z",
       "lastFetchedViews": "2026-07-23T12:41:46.705Z",
       "createdAt": "2026-07-23T12:41:46.702Z"
+    },
+    {
+      "id": "test-sub-c5b4a",
+      "campaignId": "test-campaign-i8104",
+      "campaignTitle": "Test Database Integration Campaign",
+      "clipperId": "test-clipper-iqd1n",
+      "clipperName": "Test Clipper DB",
+      "submittedUrl": "https://youtube.com/shorts/payout-1",
+      "status": "Approved",
+      "views": 5000,
+      "approvedAt": "2026-07-23T13:01:59.876Z",
+      "lastFetchedViews": "2026-07-23T13:01:59.894Z",
+      "createdAt": "2026-07-23T13:01:59.876Z"
     }
   ],
   "walletHistory": [
@@ -751,7 +820,7 @@
       "amount": 500,
       "status": "Completed",
       "description": "Funded via mock Payment Gateway",
-      "createdAt": "2026-07-23T12:41:48.272Z"
+      "createdAt": "2026-07-23T13:02:01.637Z"
     },
     {
       "id": "tx-pay_paid_666",
@@ -760,7 +829,7 @@
       "amount": 300,
       "status": "Completed",
       "description": "Funded via mock Payment Gateway",
-      "createdAt": "2026-07-23T12:41:48.311Z"
+      "createdAt": "2026-07-23T13:02:01.673Z"
     },
     {
       "id": "tx-pay_race_1212",
@@ -769,7 +838,7 @@
       "amount": 1000,
       "status": "Completed",
       "description": "Funded via mock Payment Gateway",
-      "createdAt": "2026-07-23T12:41:48.348Z"
+      "createdAt": "2026-07-23T13:02:01.712Z"
     },
     {
       "id": "tx-pay_persist_1414",
@@ -778,7 +847,7 @@
       "amount": 500,
       "status": "Completed",
       "description": "Funded via mock Payment Gateway",
-      "createdAt": "2026-07-23T12:41:48.376Z"
+      "createdAt": "2026-07-23T13:02:01.738Z"
     },
     {
       "id": "tx-pay_concur_1515",
@@ -787,7 +856,7 @@
       "amount": 600,
       "status": "Completed",
       "description": "Funded via mock Payment Gateway",
-      "createdAt": "2026-07-23T12:41:48.391Z"
+      "createdAt": "2026-07-23T13:02:01.754Z"
     }
   ],
   "payoutRequests": [
@@ -961,11 +1030,29 @@
       "amount": 200,
       "status": "Failed",
       "createdAt": "2026-07-23T12:41:46.707Z"
+    },
+    {
+      "id": "test-payout-tdaeg",
+      "clipperId": "test-clipper-iqd1n",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 500,
+      "status": "Completed",
+      "createdAt": "2026-07-23T13:01:59.895Z"
+    },
+    {
+      "id": "payout-fail-g2vte",
+      "clipperId": "test-clipper-iqd1n",
+      "clipperName": "Test Clipper DB",
+      "upiId": "testclipper@okupi",
+      "amount": 200,
+      "status": "Failed",
+      "createdAt": "2026-07-23T13:01:59.901Z"
     }
   ],
   "payments": [
     {
-      "id": "pay_rec_a9tf3",
+      "id": "pay_rec_pmxzz",
       "provider": "mock",
       "provider_order_id": "order_capture_111",
       "user_id": "creator_webhook_tester",
@@ -973,12 +1060,12 @@
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.229Z",
+      "created_at": "2026-07-23T13:02:01.592Z",
       "provider_payment_id": "pay_captured_111",
-      "paid_at": "2026-07-23T12:41:48.271Z"
+      "paid_at": "2026-07-23T13:02:01.637Z"
     },
     {
-      "id": "pay_rec_pn6uh",
+      "id": "pay_rec_zfvif",
       "provider": "mock",
       "provider_order_id": "order_sig_222",
       "user_id": "creator_webhook_tester",
@@ -986,10 +1073,10 @@
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:41:48.281Z"
+      "created_at": "2026-07-23T13:02:01.645Z"
     },
     {
-      "id": "pay_rec_35ro2",
+      "id": "pay_rec_0zbkh",
       "provider": "mock",
       "provider_order_id": "order_fail_555",
       "user_id": "creator_webhook_tester",
@@ -997,13 +1084,13 @@
       "currency": "INR",
       "status": "failed",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.302Z",
+      "created_at": "2026-07-23T13:02:01.660Z",
       "metadata": {
         "failure_reason": "Card got declined by issuer"
       }
     },
     {
-      "id": "pay_rec_jbnna",
+      "id": "pay_rec_x824x",
       "provider": "mock",
       "provider_order_id": "order_paid_666",
       "user_id": "creator_webhook_tester",
@@ -1011,12 +1098,12 @@
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.308Z",
+      "created_at": "2026-07-23T13:02:01.669Z",
       "provider_payment_id": "pay_paid_666",
-      "paid_at": "2026-07-23T12:41:48.311Z"
+      "paid_at": "2026-07-23T13:02:01.673Z"
     },
     {
-      "id": "pay_rec_84b5l",
+      "id": "pay_rec_b7ipd",
       "provider": "mock",
       "provider_order_id": "order_mismatch_888",
       "user_id": "creator_webhook_tester",
@@ -1024,10 +1111,10 @@
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:41:48.317Z"
+      "created_at": "2026-07-23T13:02:01.682Z"
     },
     {
-      "id": "pay_rec_t2iwm",
+      "id": "pay_rec_mmjqg",
       "provider": "mock",
       "provider_order_id": "order_currency_999",
       "user_id": "creator_webhook_tester",
@@ -1035,10 +1122,10 @@
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:41:48.326Z"
+      "created_at": "2026-07-23T13:02:01.689Z"
     },
     {
-      "id": "pay_rec_tv2p3",
+      "id": "pay_rec_x3wk8",
       "provider": "mock",
       "provider_order_id": "order_reused_1010",
       "user_id": "creator_webhook_tester",
@@ -1046,10 +1133,10 @@
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:41:48.334Z"
+      "created_at": "2026-07-23T13:02:01.698Z"
     },
     {
-      "id": "pay_rec_4tc10",
+      "id": "pay_rec_lmnrr",
       "provider": "mock",
       "provider_order_id": "order_race_1212",
       "user_id": "creator_webhook_tester",
@@ -1057,12 +1144,12 @@
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.347Z",
+      "created_at": "2026-07-23T13:02:01.711Z",
       "provider_payment_id": "pay_race_1212",
-      "paid_at": "2026-07-23T12:41:48.348Z"
+      "paid_at": "2026-07-23T13:02:01.712Z"
     },
     {
-      "id": "pay_rec_76jna",
+      "id": "pay_rec_jspkz",
       "provider": "mock",
       "provider_order_id": "order_fail_1313",
       "user_id": "creator_webhook_tester",
@@ -1070,10 +1157,10 @@
       "currency": "INR",
       "status": "created",
       "verification_attempts": 0,
-      "created_at": "2026-07-23T12:41:48.359Z"
+      "created_at": "2026-07-23T13:02:01.718Z"
     },
     {
-      "id": "pay_rec_zgclg",
+      "id": "pay_rec_pjh9r",
       "provider": "mock",
       "provider_order_id": "order_persist_1414",
       "user_id": "creator_webhook_tester",
@@ -1081,12 +1168,12 @@
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.371Z",
+      "created_at": "2026-07-23T13:02:01.730Z",
       "provider_payment_id": "pay_persist_1414",
-      "paid_at": "2026-07-23T12:41:48.376Z"
+      "paid_at": "2026-07-23T13:02:01.738Z"
     },
     {
-      "id": "pay_rec_akp6z",
+      "id": "pay_rec_es3zg",
       "provider": "mock",
       "provider_order_id": "order_concur_1515",
       "user_id": "creator_webhook_tester",
@@ -1094,9 +1181,9 @@
       "currency": "INR",
       "status": "paid",
       "verification_attempts": 1,
-      "created_at": "2026-07-23T12:41:48.384Z",
+      "created_at": "2026-07-23T13:02:01.745Z",
       "provider_payment_id": "pay_concur_1515",
-      "paid_at": "2026-07-23T12:41:48.391Z"
+      "paid_at": "2026-07-23T13:02:01.754Z"
     }
   ],
   "financialLedger": [
@@ -1110,7 +1197,7 @@
       "amount": 500,
       "status": "completed",
       "description": "Deposit via Payment Gateway (Order ID: order_capture_111, Payment ID: pay_captured_111)",
-      "createdAt": "2026-07-23T12:41:48.271Z"
+      "createdAt": "2026-07-23T13:02:01.637Z"
     },
     {
       "id": "led-pay_paid_666",
@@ -1122,7 +1209,7 @@
       "amount": 300,
       "status": "completed",
       "description": "Deposit via Payment Gateway (Order ID: order_paid_666, Payment ID: pay_paid_666)",
-      "createdAt": "2026-07-23T12:41:48.311Z"
+      "createdAt": "2026-07-23T13:02:01.673Z"
     },
     {
       "id": "led-pay_race_1212",
@@ -1134,7 +1221,7 @@
       "amount": 1000,
       "status": "completed",
       "description": "Deposit via Payment Gateway (Order ID: order_race_1212, Payment ID: pay_race_1212)",
-      "createdAt": "2026-07-23T12:41:48.348Z"
+      "createdAt": "2026-07-23T13:02:01.712Z"
     },
     {
       "id": "led-pay_persist_1414",
@@ -1146,7 +1233,7 @@
       "amount": 500,
       "status": "completed",
       "description": "Deposit via Payment Gateway (Order ID: order_persist_1414, Payment ID: pay_persist_1414)",
-      "createdAt": "2026-07-23T12:41:48.376Z"
+      "createdAt": "2026-07-23T13:02:01.738Z"
     },
     {
       "id": "led-pay_concur_1515",
@@ -1158,7 +1245,7 @@
       "amount": 600,
       "status": "completed",
       "description": "Deposit via Payment Gateway (Order ID: order_concur_1515, Payment ID: pay_concur_1515)",
-      "createdAt": "2026-07-23T12:41:48.391Z"
+      "createdAt": "2026-07-23T13:02:01.754Z"
     }
   ],
   "auditEvents": [
@@ -1168,14 +1255,14 @@
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_rec_a9tf3",
+      "entityId": "pay_rec_pmxzz",
       "metadata": {
         "amountPaise": 50000,
         "orderId": "order_capture_111",
         "paymentId": "pay_captured_111",
         "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:41:48.272Z"
+      "createdAt": "2026-07-23T13:02:01.637Z"
     },
     {
       "id": "aud-pay_paid_666",
@@ -1183,14 +1270,14 @@
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_rec_jbnna",
+      "entityId": "pay_rec_x824x",
       "metadata": {
         "amountPaise": 30000,
         "orderId": "order_paid_666",
         "paymentId": "pay_paid_666",
         "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:41:48.311Z"
+      "createdAt": "2026-07-23T13:02:01.673Z"
     },
     {
       "id": "aud-pay_race_1212",
@@ -1198,14 +1285,14 @@
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_rec_4tc10",
+      "entityId": "pay_rec_lmnrr",
       "metadata": {
         "amountPaise": 100000,
         "orderId": "order_race_1212",
         "paymentId": "pay_race_1212",
         "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:41:48.348Z"
+      "createdAt": "2026-07-23T13:02:01.712Z"
     },
     {
       "id": "aud-pay_persist_1414",
@@ -1213,14 +1300,14 @@
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_rec_zgclg",
+      "entityId": "pay_rec_pjh9r",
       "metadata": {
         "amountPaise": 50000,
         "orderId": "order_persist_1414",
         "paymentId": "pay_persist_1414",
         "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:41:48.376Z"
+      "createdAt": "2026-07-23T13:02:01.738Z"
     },
     {
       "id": "aud-pay_concur_1515",
@@ -1228,14 +1315,14 @@
       "actorRole": "creator",
       "action": "PAYMENT_DEPOSIT_SUCCESS",
       "entityType": "payment",
-      "entityId": "pay_rec_akp6z",
+      "entityId": "pay_rec_es3zg",
       "metadata": {
         "amountPaise": 60000,
         "orderId": "order_concur_1515",
         "paymentId": "pay_concur_1515",
         "provider": "mock"
       },
-      "createdAt": "2026-07-23T12:41:48.391Z"
+      "createdAt": "2026-07-23T13:02:01.754Z"
     }
   ],
   "viewPayoutEvents": [
@@ -1418,6 +1505,26 @@
       "clipperAmount": 480,
       "platformAmount": 120,
       "processedAt": "2026-07-23T12:41:46.705Z"
+    },
+    {
+      "submissionId": "test-sub-c5b4a",
+      "previousViews": 0,
+      "newViews": 2000,
+      "verifiedViews": 2000,
+      "grossAmount": 400,
+      "clipperAmount": 320,
+      "platformAmount": 80,
+      "processedAt": "2026-07-23T13:01:59.877Z"
+    },
+    {
+      "submissionId": "test-sub-c5b4a",
+      "previousViews": 2000,
+      "newViews": 5000,
+      "verifiedViews": 3000,
+      "grossAmount": 600,
+      "clipperAmount": 480,
+      "platformAmount": 120,
+      "processedAt": "2026-07-23T13:01:59.894Z"
     }
   ],
   "webhookEvents": [
@@ -1425,7 +1532,7 @@
       "id": "evt_1",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.270Z",
+      "received_at": "2026-07-23T13:02:01.635Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_capture_111",
@@ -1433,13 +1540,13 @@
         "amountPaise": 50000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.272Z"
+      "processed_at": "2026-07-23T13:02:01.637Z"
     },
     {
       "id": "evt_5",
       "provider": "razorpay",
       "event_type": "payment.failed",
-      "received_at": "2026-07-23T12:41:48.306Z",
+      "received_at": "2026-07-23T13:02:01.665Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_fail_555",
@@ -1447,13 +1554,13 @@
         "amountPaise": 25000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.307Z"
+      "processed_at": "2026-07-23T13:02:01.667Z"
     },
     {
       "id": "evt_6",
       "provider": "razorpay",
       "event_type": "order.paid",
-      "received_at": "2026-07-23T12:41:48.310Z",
+      "received_at": "2026-07-23T13:02:01.673Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_paid_666",
@@ -1461,13 +1568,13 @@
         "amountPaise": 30000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.311Z"
+      "processed_at": "2026-07-23T13:02:01.674Z"
     },
     {
       "id": "evt_7",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.316Z",
+      "received_at": "2026-07-23T13:02:01.679Z",
       "processing_status": "failed",
       "payload": {
         "orderId": "order_unknown_777",
@@ -1475,13 +1582,13 @@
         "amountPaise": 50000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.316Z"
+      "processed_at": "2026-07-23T13:02:01.680Z"
     },
     {
       "id": "evt_8",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.322Z",
+      "received_at": "2026-07-23T13:02:01.687Z",
       "processing_status": "failed",
       "payload": {
         "orderId": "order_mismatch_888",
@@ -1489,13 +1596,13 @@
         "amountPaise": 10000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.323Z"
+      "processed_at": "2026-07-23T13:02:01.688Z"
     },
     {
       "id": "evt_9",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.331Z",
+      "received_at": "2026-07-23T13:02:01.694Z",
       "processing_status": "failed",
       "payload": {
         "orderId": "order_currency_999",
@@ -1503,13 +1610,13 @@
         "amountPaise": 10000,
         "currency": "USD"
       },
-      "processed_at": "2026-07-23T12:41:48.332Z"
+      "processed_at": "2026-07-23T13:02:01.695Z"
     },
     {
       "id": "evt_10",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.338Z",
+      "received_at": "2026-07-23T13:02:01.701Z",
       "processing_status": "failed",
       "payload": {
         "orderId": "order_reused_1010",
@@ -1517,13 +1624,13 @@
         "amountPaise": 50000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.339Z"
+      "processed_at": "2026-07-23T13:02:01.702Z"
     },
     {
       "id": "evt_11_fail",
       "provider": "razorpay",
       "event_type": "payment.failed",
-      "received_at": "2026-07-23T12:41:48.344Z",
+      "received_at": "2026-07-23T13:02:01.706Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_capture_111",
@@ -1531,13 +1638,13 @@
         "amountPaise": 50000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.345Z"
+      "processed_at": "2026-07-23T13:02:01.707Z"
     },
     {
       "id": "evt_12",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.357Z",
+      "received_at": "2026-07-23T13:02:01.715Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_race_1212",
@@ -1545,13 +1652,13 @@
         "amountPaise": 100000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.358Z"
+      "processed_at": "2026-07-23T13:02:01.716Z"
     },
     {
       "id": "evt_13",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.362Z",
+      "received_at": "2026-07-23T13:02:01.721Z",
       "processing_status": "received",
       "payload": {
         "orderId": "order_fail_1313",
@@ -1564,7 +1671,7 @@
       "id": "evt_14",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.375Z",
+      "received_at": "2026-07-23T13:02:01.736Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_persist_1414",
@@ -1572,13 +1679,13 @@
         "amountPaise": 50000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.376Z"
+      "processed_at": "2026-07-23T13:02:01.739Z"
     },
     {
       "id": "evt_concur_1515",
       "provider": "razorpay",
       "event_type": "payment.captured",
-      "received_at": "2026-07-23T12:41:48.390Z",
+      "received_at": "2026-07-23T13:02:01.752Z",
       "processing_status": "processed",
       "payload": {
         "orderId": "order_concur_1515",
@@ -1586,7 +1693,7 @@
         "amountPaise": 60000,
         "currency": "INR"
       },
-      "processed_at": "2026-07-23T12:41:48.392Z"
+      "processed_at": "2026-07-23T13:02:01.754Z"
     }
   ]
 }

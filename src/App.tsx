@@ -334,14 +334,21 @@ export default function App() {
         return;
       }
 
-      // 1. Create order on backend
-      const orderRes = await fetch(`${API_BASE}/api/create-order`, {
+      // Requirement 4: If Razorpay script is missing, fail visibly with exact error message
+      if (!(window as any).Razorpay) {
+        showToast("Razorpay Checkout is unavailable. Payment was NOT processed.", "error");
+        setDepositing(false);
+        return;
+      }
+
+      // 1. Create order on backend (using primary secure endpoint)
+      const orderRes = await fetch(`${API_BASE}/api/payments/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeader()
         },
-        body: JSON.stringify({ amount: amountPaise, currency: "INR" })
+        body: JSON.stringify({ amountPaise, currency: "INR" })
       });
       
       const orderData = await orderRes.json();
@@ -349,23 +356,27 @@ export default function App() {
         throw new Error(orderData.error || "Failed to create payment order");
       }
 
-      const orderId = orderData.order_id;
+      const { provider, testMode, order } = orderData;
+      const orderId = order.id;
 
-      // If it is a mock order (starts with order_mock_) or we are in mock mode:
-      if (orderId && orderId.startsWith("order_mock_")) {
+      // In production Razorpay mode, NEVER simulate a successful payment.
+      // Remove any frontend fallback when PAYMENT_PROVIDER=razorpay (testMode is false)
+      if (testMode || provider === "mock") {
         showToast("Mock provider detected. Simulating successful Razorpay payment...", "success");
         
-        // Call verification endpoint with mock signature
-        const verifyRes = await fetch(`${API_BASE}/api/verify-payment`, {
+        // Call verification endpoint /api/payments/verify with mock signature
+        const verifyRes = await fetch(`${API_BASE}/api/payments/verify`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...getAuthHeader()
           },
           body: JSON.stringify({
-            order_id: orderId,
-            payment_id: "pay_mock_" + Math.random().toString(36).substring(2, 9),
-            razorpay_signature: "signature_mock_success"
+            orderId: orderId,
+            paymentId: "pay_mock_" + Math.random().toString(36).substring(2, 9),
+            signature: "signature_mock_success",
+            amountPaise,
+            currency: "INR"
           })
         });
 
@@ -389,34 +400,38 @@ export default function App() {
         return;
       }
 
-      // 2. Open Razorpay checkout modal
+      // 2. Open Razorpay checkout modal (Only in real Razorpay mode)
       const keyId = (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || "rzp_test_TGwV4IG0QQsWn0";
-      
-      if (!(window as any).Razorpay) {
-        throw new Error("Razorpay SDK not loaded. Please check your internet connection.");
-      }
 
       const options = {
         key: keyId,
-        amount: orderData.amount,
-        currency: orderData.currency || "INR",
+        amount: order.amount,
+        currency: order.currency || "INR",
         name: "QUOR Escrow",
         description: "Escrow wallet deposit",
         order_id: orderId,
         handler: async function (response: any) {
           try {
             setDepositing(true);
-            // On success: receive razorpay_payment_id, razorpay_order_id, razorpay_signature
-            const verifyRes = await fetch(`${API_BASE}/api/verify-payment`, {
+            
+            // Requirement 2: NEVER call /api/payments/verify without receiving: order_id, payment_id, razorpay_signature
+            if (!response.razorpay_order_id || !response.razorpay_payment_id || !response.razorpay_signature) {
+              throw new Error("Missing response parameters from Razorpay Checkout.");
+            }
+
+            // On success: call verification endpoint with actual parameters
+            const verifyRes = await fetch(`${API_BASE}/api/payments/verify`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 ...getAuthHeader()
               },
               body: JSON.stringify({
-                order_id: response.razorpay_order_id,
-                payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                amountPaise,
+                currency: "INR"
               })
             });
 
@@ -452,6 +467,7 @@ export default function App() {
         },
         modal: {
           ondismiss: function () {
+            // Requirement 5: If the Razorpay modal is cancelled, do not call verification and do not credit wallet
             showToast("Payment modal closed by user.", "error");
             setDepositing(false);
           }
@@ -461,6 +477,7 @@ export default function App() {
       const rzp = new (window as any).Razorpay(options);
       
       rzp.on("payment.failed", function (response: any) {
+        // Requirement 6: If payment fails, do not call successful verification and do not credit wallet
         showToast(`Payment failed: ${response.error.description}`, "error");
         setDepositing(false);
       });

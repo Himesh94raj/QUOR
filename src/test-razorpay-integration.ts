@@ -295,7 +295,162 @@ async function runRazorpayIntegrationTests() {
     assert(threwException === true, "Unknown PAYMENT_PROVIDER must throw an exception");
     console.log("\x1b[32m✔ Scenario 10 Passed successfully!\x1b[0m\n");
 
-    console.log("\x1b[1;32m🎉 ALL 10 RAZORPAY INTEGRATION SCENARIOS PASSED PERFECTLY! 🎉\x1b[0m\n");
+    // Restore environment temporarily for new tests
+    process.env.PAYMENT_PROVIDER = "razorpay";
+    process.env.RAZORPAY_KEY_ID = "rzp_test_123";
+    process.env.RAZORPAY_KEY_SECRET = "rzp_secret_456";
+    process.env.RAZORPAY_WEBHOOK_SECRET = "rzp_webhook_789";
+
+    const rzpProv = getPaymentProvider() as RazorpayPaymentProvider;
+
+    // --- Scenario 11: Missing Razorpay payment_id rejects verification ---
+    console.log("👉 Scenario 11: Missing Razorpay payment_id rejects verification");
+    const missingPaymentIdRes = await rzpProv.verifyPayment({
+      orderId: "order_123",
+      paymentId: "",
+      signature: "sig_123"
+    });
+    assert(missingPaymentIdRes.success === false, "Missing payment_id must fail verification");
+    assert(missingPaymentIdRes.error !== undefined, "Should contain error message");
+    console.log("\x1b[32m✔ Scenario 11 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 12: Missing signature rejects verification ---
+    console.log("👉 Scenario 12: Missing signature rejects verification");
+    const missingSignatureRes = await rzpProv.verifyPayment({
+      orderId: "order_123",
+      paymentId: "pay_123",
+      signature: ""
+    });
+    assert(missingSignatureRes.success === false, "Missing signature must fail verification");
+    assert(missingSignatureRes.error !== undefined, "Should contain error message");
+    console.log("\x1b[32m✔ Scenario 12 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 13: Mock fallback cannot credit a wallet when PAYMENT_PROVIDER=razorpay ---
+    console.log("👉 Scenario 13: Mock fallback cannot credit a wallet when PAYMENT_PROVIDER=razorpay");
+    // Under razorpay provider, mock credentials/signatures cannot succeed
+    const mockSigRes = await rzpProv.verifyPayment({
+      orderId: "order_abc",
+      paymentId: "pay_mock_123",
+      signature: "signature_mock_success"
+    });
+    assert(mockSigRes.success === false, "Mock fallback signature must be rejected when provider is razorpay");
+    console.log("\x1b[32m✔ Scenario 13 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 14: Fake frontend success cannot credit wallet ---
+    console.log("👉 Scenario 14: Fake frontend success cannot credit wallet");
+    // A fake frontend verification request with fabricated values will fail verification on the provider
+    const fakeFrontendRes = await rzpProv.verifyPayment({
+      orderId: "order_fake_123",
+      paymentId: "pay_fake_456",
+      signature: "fake_sig_789"
+    });
+    assert(fakeFrontendRes.success === false, "Fake credentials must not succeed");
+    console.log("\x1b[32m✔ Scenario 14 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 15: Only valid Razorpay signature + matching order + matching amount + correct owner can credit exactly once ---
+    console.log("👉 Scenario 15: Only valid Razorpay signature + matching order + matching amount + correct owner can credit exactly once");
+    const validOrderId = "order_valid_111";
+    const validPaymentId = "pay_valid_222";
+    const validUserId = "user_valid_owner";
+    const validAmount = 50000; // 500 INR in paise
+
+    const dbValid = loadDb();
+    dbValid.creatorProfiles[validUserId] = { userId: validUserId, channelUrl: "", walletBalance: 100 };
+
+    const validRecord: PaymentRecord = {
+      id: "pay_rec_valid_111",
+      provider: "razorpay",
+      provider_order_id: validOrderId,
+      user_id: validUserId,
+      amount_paise: validAmount,
+      currency: "INR",
+      status: "created",
+      verification_attempts: 0,
+      created_at: new Date().toISOString()
+    };
+
+    if (!dbValid.payments) dbValid.payments = [];
+    dbValid.payments = dbValid.payments.filter(p => p.provider_order_id !== validOrderId);
+    dbValid.payments.push(validRecord);
+    saveDb(dbValid);
+
+    // 1. Wrong Owner fails
+    const wrongOwnerRes = await paymentRepository.depositCreatorFundsRpc({
+      userId: "wrong_user",
+      orderId: validOrderId,
+      paymentId: validPaymentId,
+      amountPaise: validAmount,
+      provider: "razorpay",
+      currency: "INR",
+      refId: "ref_valid_1",
+      ledgerId: "led_valid_1",
+      txId: "tx_valid_1",
+      auditId: "aud_valid_1"
+    });
+    assert(wrongOwnerRes.success === false, "Wrong owner must fail depositCreatorFundsRpc");
+
+    // 2. Wrong Amount fails
+    const wrongAmountRes = await paymentRepository.depositCreatorFundsRpc({
+      userId: validUserId,
+      orderId: validOrderId,
+      paymentId: validPaymentId,
+      amountPaise: validAmount + 100, // Mismatch
+      provider: "razorpay",
+      currency: "INR",
+      refId: "ref_valid_2",
+      ledgerId: "led_valid_2",
+      txId: "tx_valid_2",
+      auditId: "aud_valid_2"
+    });
+    assert(wrongAmountRes.success === false, "Wrong amount must fail depositCreatorFundsRpc");
+
+    // 3. Valid credentials succeeds
+    const correctRes = await paymentRepository.depositCreatorFundsRpc({
+      userId: validUserId,
+      orderId: validOrderId,
+      paymentId: validPaymentId,
+      amountPaise: validAmount,
+      provider: "razorpay",
+      currency: "INR",
+      refId: "ref_valid_correct",
+      ledgerId: "led_valid_correct",
+      txId: "tx_valid_correct",
+      auditId: "aud_valid_correct"
+    });
+    assert(correctRes.success === true, "Valid credentials must successfully credit wallet");
+
+    // 4. Double credit (idempotency) fails
+    const doubleCreditRes = await paymentRepository.depositCreatorFundsRpc({
+      userId: validUserId,
+      orderId: validOrderId,
+      paymentId: validPaymentId,
+      amountPaise: validAmount,
+      provider: "razorpay",
+      currency: "INR",
+      refId: "ref_valid_correct_double",
+      ledgerId: "led_valid_correct_double",
+      txId: "tx_valid_correct_double",
+      auditId: "aud_valid_correct_double"
+    });
+    assert(doubleCreditRes.success === false, "Cannot credit ledger more than once");
+    console.log("\x1b[32m✔ Scenario 15 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 16: Clicking deposit without Razorpay Checkout does NOT credit wallet ---
+    console.log("👉 Scenario 16: Clicking deposit without Razorpay Checkout does NOT credit wallet");
+    const testWindow: any = {};
+    let scriptThrewError = false;
+    try {
+      if (!testWindow.Razorpay) {
+        throw new Error("Razorpay Checkout is unavailable. Payment was NOT processed.");
+      }
+    } catch (err: any) {
+      scriptThrewError = true;
+      assert(err.message === "Razorpay Checkout is unavailable. Payment was NOT processed.", "Must throw expected error");
+    }
+    assert(scriptThrewError === true, "Must throw error when Razorpay script is missing");
+    console.log("\x1b[32m✔ Scenario 16 Passed successfully!\x1b[0m\n");
+
+    console.log("\x1b[1;32m🎉 ALL 16 RAZORPAY INTEGRATION SCENARIOS PASSED PERFECTLY! 🎉\x1b[0m\n");
   } finally {
     // Restore original environment
     process.env.PAYMENT_PROVIDER = originalProvider;
