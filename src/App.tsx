@@ -149,12 +149,18 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  const getAuthHeader = () => {
+    const token = user?.token || authToken || localStorage.getItem("quor_token") || user?.id || "";
+    return { Authorization: `Bearer ${token}` };
+  };
+
   // Whenever user session triggers, cache and preload profiles
   useEffect(() => {
     if (user) {
       localStorage.setItem("quor_user", JSON.stringify(user));
-      localStorage.setItem("quor_token", user.id);
-      setAuthToken(user.id);
+      const token = user.token || localStorage.getItem("quor_token") || user.id;
+      localStorage.setItem("quor_token", token);
+      setAuthToken(token);
       loadUserProfile();
       
       // Auto routing deep locks
@@ -216,7 +222,7 @@ export default function App() {
     try {
       if (user.role === "clipper") {
         const res = await fetch(`${API_BASE}/api/clipper/profile`, {
-          headers: { Authorization: `Bearer ${user.id}` }
+          headers: { ...getAuthHeader() }
         });
         if (res.ok) {
           const data = await res.json();
@@ -232,7 +238,7 @@ export default function App() {
         fetchClipperStats();
       } else if (user.role === "creator") {
         const res = await fetch(`${API_BASE}/api/creator/profile`, {
-          headers: { Authorization: `Bearer ${user.id}` }
+          headers: { ...getAuthHeader() }
         });
         if (res.ok) {
           const data = await res.json();
@@ -254,7 +260,7 @@ export default function App() {
     try {
       // Get my submissions
       const subRes = await fetch(`${API_BASE}/api/submissions/my`, {
-        headers: { Authorization: `Bearer ${user.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (subRes.ok) {
         const subs = await subRes.json();
@@ -263,7 +269,7 @@ export default function App() {
 
       // Get payouts
       const payRes = await fetch(`${API_BASE}/api/clipper/payouts`, {
-        headers: { Authorization: `Bearer ${user.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (payRes.ok) {
         const pays = await payRes.json();
@@ -272,7 +278,7 @@ export default function App() {
 
       // Get transaction history
       const txRes = await fetch(`${API_BASE}/api/wallet/history`, {
-        headers: { Authorization: `Bearer ${user.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (txRes.ok) {
         const txs = await txRes.json();
@@ -303,7 +309,7 @@ export default function App() {
     try {
       setSelectedCampaign(camp);
       const res = await fetch(`${API_BASE}/api/campaigns/${camp.id}/submissions`, {
-        headers: { Authorization: `Bearer ${user?.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (res.ok) {
         setCampaignSubmissions(await res.json());
@@ -324,7 +330,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ amount: Number(depositAmount) })
       });
@@ -352,7 +358,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           title: campTitle,
@@ -419,7 +425,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/campaigns/${campId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${user?.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (res.ok) {
         showToast("Campaign closed. Unspent escrow refunded to your profile balance.", "success");
@@ -439,7 +445,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ status, feedback })
       });
@@ -450,7 +456,7 @@ export default function App() {
       
       // Update local state arrays
       setCampaignSubmissions(prev => 
-        prev.map(s => s.id === submissionId ? { ...s, status, feedback, approvedAt: new Date().toISOString() } : s)
+         prev.map(s => s.id === submissionId ? { ...s, status, feedback, approvedAt: new Date().toISOString() } : s)
       );
       fetchPlatformStats();
     } catch (err: any) {
@@ -467,7 +473,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({
           upiId: clipperUpi,
@@ -501,7 +507,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ channelUrl: creatorChannel })
       });
@@ -527,7 +533,7 @@ export default function App() {
 
       // Users
       const usersRes = await fetch(`${API_BASE}/api/admin/users`, {
-        headers: { Authorization: `Bearer ${user.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (usersRes.ok) setAdminUsers(await usersRes.json());
 
@@ -537,7 +543,7 @@ export default function App() {
 
       // Payout Requests
       const payRes = await fetch(`${API_BASE}/api/clipper/payouts`, {
-        headers: { Authorization: `Bearer ${user.id}` }
+        headers: { ...getAuthHeader() }
       });
       if (payRes.ok) setAdminPayoutList(await payRes.json());
     } catch (e) {
@@ -554,7 +560,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ status })
       });
@@ -574,7 +580,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ status })
       });
@@ -595,7 +601,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.id}`
+          ...getAuthHeader()
         },
         body: JSON.stringify({ status: newStatus, durationDays, reason })
       });
@@ -691,12 +697,13 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Signup Failed");
       
-      // Auto login
+      // Auto login with the JWT token
       setUser({
         id: data.id,
         name: data.name,
         email: data.email,
         role: data.role,
+        token: data.token,
         createdAt: new Date().toISOString()
       });
       showToast("Registration successful!", "success");

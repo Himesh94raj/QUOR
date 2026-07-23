@@ -133,7 +133,7 @@ export const ContactView: React.FC = () => {
                     required
                     value={formData.email}
                     onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="you@domain.com"
+                    placeholder="you@gmail.com"
                     className="w-full bg-[#171e2e] border border-gray-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 transition-colors"
                   />
                 </div>

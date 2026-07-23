@@ -3,9 +3,13 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage } from "./src/types.js";
+
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
 
@@ -26,6 +30,68 @@ console.log("SUPABASE URL:", supabaseUrl);
 console.log("SERVICE ROLE PRESENT:", !!supabaseKey);
 console.log("SERVICE ROLE PREFIX:", supabaseKey ? supabaseKey.substring(0, 20) : "MISSING");
 console.log("====================================");
+
+const JWT_SECRET = process.env.JWT_SECRET || "use-a-long-random-secret-value";
+
+// Rate limiter for login endpoints (max 5 login attempts per IP per 15 mins)
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: { error: "Too many login attempts from this IP, please try again after 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Zod Validation Schemas
+const signupSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["creator", "clipper"])
+});
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required")
+});
+
+const clipperProfileSchema = z.object({
+  upiId: z.string().optional().nullable(),
+  instagramHandle: z.string().optional().nullable(),
+  youtubeHandle: z.string().optional().nullable(),
+  kycAadhaar: z.string().optional().nullable(),
+  kycPan: z.string().optional().nullable(),
+  kycDocUrl: z.string().optional().nullable()
+});
+
+const creatorProfileSchema = z.object({
+  channelUrl: z.string().optional().nullable()
+});
+
+const walletDepositSchema = z.object({
+  amount: z.union([z.number(), z.string()]).refine(val => {
+    const num = typeof val === "number" ? val : parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, { message: "Amount must be a positive number." })
+});
+
+const campaignCreationSchema = z.object({
+  title: z.string().min(1, "Campaign title is required"),
+  sourceVideoUrl: z.string().url("Source video must be a valid URL"),
+  cpm: z.union([z.number(), z.string()]).transform(val => typeof val === "number" ? val : parseFloat(val)).refine(val => val > 0, "CPM must be a positive number"),
+  budget: z.union([z.number(), z.string()]).transform(val => typeof val === "number" ? val : parseFloat(val)).refine(val => val > 0, "Budget must be a positive number"),
+  instructions: z.string().min(1, "Campaign instructions are required"),
+  platform: z.enum(["instagram", "youtube", "both", "facebook", "twitter"]),
+  minDuration: z.union([z.number(), z.string()]).transform(val => typeof val === "number" ? val : parseFloat(val)).refine(val => val > 0, "Minimum duration must be a positive number"),
+  deadline: z.string().min(1, "Deadline is required"),
+  iconUrl: z.string().url().optional().nullable(),
+  campaignType: z.enum(["both", "ugc", "clipping"]).optional().nullable()
+});
+
+const payoutRequestSchema = z.object({
+  amount: z.union([z.number(), z.string()]).transform(val => typeof val === "number" ? val : parseFloat(val)).refine(val => val >= 500, "Minimum withdrawal threshold is ₹500.")
+});
+
 
 let isSyncing = false;
 
@@ -638,7 +704,22 @@ const startServer = async () => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized access. No session found." });
     }
-    const userId = authHeader.split(" ")[1];
+    const token = authHeader.split(" ")[1];
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err: any) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ error: "Session expired. Please log in again." });
+      }
+      return res.status(401).json({ error: "Invalid token. Please log in again." });
+    }
+
+    const userId = decoded?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid token payload." });
+    }
 
     try {
       // 1. Try fetching from Supabase first to support new registrations
@@ -741,10 +822,16 @@ const startServer = async () => {
   // Auth Endpoints
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { name, email, password, role } = req.body;
-      if (!name || !email || !password || !role) {
-        return res.status(400).json({ error: "Missing required signup fields." });
+      if (req.body.role === "admin") {
+        return res.status(403).json({ error: "Access Denied. Public users cannot register as Admin." });
       }
+
+      const parsed = signupSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+
+      const { name, email, password, role } = parsed.data;
 
       // 1. Check if email is already registered in Supabase
       const { data: existing, error: checkError } = await supabase
@@ -772,7 +859,7 @@ const startServer = async () => {
         .insert([{
           id: userId,
           name,
-          email,
+          email: email.toLowerCase(),
           password: hashedPassword,
           role,
           status: "active",
@@ -785,7 +872,20 @@ const startServer = async () => {
         return res.status(500).json({ error: "Failed to register user." });
       }
 
-      // 3. Create profiles in Supabase
+      // Also register inside local memory DB for safe local fallback parity
+      const db = loadDb();
+      db.users.push({
+        id: userId,
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        role,
+        createdAt,
+        status: "active",
+        statusReason: ""
+      });
+
+      // 3. Create profiles in Supabase and local DB
       if (role === "clipper") {
         const { error: profileErr } = await supabase
           .from("clipper_profiles")
@@ -802,6 +902,17 @@ const startServer = async () => {
         if (profileErr) {
           console.warn("Supabase signup profile creation error:", profileErr);
         }
+
+        db.clipperProfiles[userId] = {
+          userId,
+          upiId: "",
+          instagramHandle: "",
+          youtubeHandle: "",
+          kycStatus: "Pending",
+          kycDocUrl: "",
+          kycAadhaar: "",
+          kycPan: ""
+        };
       } else if (role === "creator") {
         const { error: profileErr } = await supabase
           .from("creator_profiles")
@@ -813,15 +924,37 @@ const startServer = async () => {
         if (profileErr) {
           console.warn("Supabase signup profile creation error:", profileErr);
         }
+
+        db.creatorProfiles[userId] = {
+          userId,
+          channelUrl: "",
+          walletBalance: 0
+        };
       }
 
-      const isOwnerAdmin = role === "admin" && email && process.env.OWNER_EMAIL && email.toLowerCase() === process.env.OWNER_EMAIL.toLowerCase() ? true : false;
+      saveDb(db);
+
+      const isOwnerAdmin = false;
+      
+      // Generate secure JWT token
+      const token = jwt.sign(
+        {
+          userId,
+          role
+        },
+        JWT_SECRET,
+        {
+          expiresIn: "7d"
+        }
+      );
+
       res.status(201).json({
         id: userId,
         name,
         email,
         role,
-        isOwnerAdmin
+        isOwnerAdmin,
+        token
       });
     } catch (err: any) {
       console.error("Signup catch error:", err);
@@ -829,12 +962,13 @@ const startServer = async () => {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", loginRateLimiter, async (req, res) => {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ error: "Please enter email and password." });
+      const parsed = loginSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
       }
+      const { email, password } = parsed.data;
 
       // 1. Query Supabase users table
       const { data: user, error } = await supabase
@@ -888,12 +1022,26 @@ const startServer = async () => {
       }
 
       const isOwnerAdmin = user.role === "admin" && user.email && ownerEmail && user.email.toLowerCase() === ownerEmail.toLowerCase() ? true : false;
+
+      // Generate secure JWT token
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          role: user.role
+        },
+        JWT_SECRET,
+        {
+          expiresIn: "7d"
+        }
+      );
+
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        isOwnerAdmin
+        isOwnerAdmin,
+        token
       });
     } catch (err: any) {
       console.error("Login catch error:", err);
@@ -930,7 +1078,11 @@ const startServer = async () => {
   });
 
   app.post("/api/clipper/profile", authenticateUser, (req: any, res) => {
-    const { upiId, instagramHandle, youtubeHandle, kycAadhaar, kycPan, kycDocUrl } = req.body;
+    const parsed = clipperProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
+    }
+    const { upiId, instagramHandle, youtubeHandle, kycAadhaar, kycPan, kycDocUrl } = parsed.data;
     const db = loadDb();
     
     let profile = db.clipperProfiles[req.user.id];
@@ -975,7 +1127,11 @@ const startServer = async () => {
   });
 
   app.post("/api/creator/profile", authenticateUser, (req: any, res) => {
-    const { channelUrl } = req.body;
+    const parsed = creatorProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
+    }
+    const { channelUrl } = parsed.data;
     const db = loadDb();
     
     let profile = db.creatorProfiles[req.user.id];
@@ -996,10 +1152,11 @@ const startServer = async () => {
 
   // Wallet and Deposits
   app.post("/api/creator/wallet/deposit", authenticateUser, (req: any, res) => {
-    const { amount } = req.body;
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ error: "Invalid transfer amount." });
+    const parsed = walletDepositSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
     }
+    const amount = typeof parsed.data.amount === "number" ? parsed.data.amount : parseFloat(parsed.data.amount);
     const db = loadDb();
     let profile = db.creatorProfiles[req.user.id];
     if (!profile) {
@@ -1007,13 +1164,13 @@ const startServer = async () => {
       db.creatorProfiles[req.user.id] = profile;
     }
 
-    profile.walletBalance += parseFloat(amount);
+    profile.walletBalance += amount;
 
     const transaction: WalletTransaction = {
       id: "tx-" + Math.random().toString(36).substring(2, 9),
       userId: req.user.id,
       type: "deposit",
-      amount: parseFloat(amount),
+      amount: amount,
       status: "Completed",
       description: `Fund Added via Razorpay Payment Gateway (UPI ID Simulation)`,
       createdAt: new Date().toISOString()
@@ -1042,10 +1199,11 @@ const startServer = async () => {
     if (req.user.role !== "creator" && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only Creators can create campaigns." });
     }
-    const { title, sourceVideoUrl, cpm, budget, instructions, platform, minDuration, deadline, iconUrl, campaignType } = req.body;
-    if (!title || !sourceVideoUrl || !cpm || !budget || !instructions || !platform || !minDuration || !deadline) {
-      return res.status(400).json({ error: "Please provide all required campaign fields." });
+    const parsed = campaignCreationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
     }
+    const { title, sourceVideoUrl, cpm, budget, instructions, platform, minDuration, deadline, iconUrl, campaignType } = parsed.data;
 
     const db = loadDb();
     const creatorProf = db.creatorProfiles[req.user.id];
@@ -1269,10 +1427,11 @@ const startServer = async () => {
       return res.status(403).json({ error: "Only clippers can request withdrawals." });
     }
 
-    const { amount } = req.body;
-    if (!amount || isNaN(amount) || amount < 500) {
-      return res.status(400).json({ error: "Minimum withdrawal threshold is ₹500." });
+    const parsed = payoutRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
     }
+    const amount = parsed.data.amount;
 
     const db = loadDb();
     const clipperProfile = db.clipperProfiles[req.user.id];
