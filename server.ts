@@ -8,7 +8,7 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage } from "./src/types.js";
+import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent } from "./src/types.js";
 
 
 const FILE_PATH = path.join(process.cwd(), "database.json");
@@ -433,6 +433,276 @@ const saveDb = (db: DbSchema) => {
   });
 };
 
+// Financial Ledger Helpers & Double-Entry Bookkeeping Engine
+
+function recordLedgerEntry(
+  db: DbSchema,
+  entry: Omit<FinancialLedgerEntry, "id" | "createdAt">
+): FinancialLedgerEntry {
+  if (!db.financialLedger) {
+    db.financialLedger = [];
+  }
+
+  // Check if referenceId already exists to ensure idempotency
+  const existing = db.financialLedger.find(e => e.referenceId === entry.referenceId);
+  if (existing) {
+    return existing;
+  }
+
+  const newEntry: FinancialLedgerEntry = {
+    id: "led-" + Math.random().toString(36).substring(2, 9),
+    ...entry,
+    createdAt: new Date().toISOString()
+  };
+
+  db.financialLedger.push(newEntry);
+
+  // Sync cache
+  if (entry.userId) {
+    syncClipperBalanceCache(db, entry.userId);
+  }
+
+  return newEntry;
+}
+
+function getDerivedClipperBalance(db: DbSchema, userId: string): ClipperBalance {
+  if (!db.financialLedger) {
+    db.financialLedger = [];
+  }
+
+  let totalEarned = 0;
+  let totalWithdrawn = 0;
+  let pendingWithdrawal = 0;
+
+  for (const entry of db.financialLedger) {
+    if (entry.userId !== userId) continue;
+
+    if (entry.referenceType === "clipper_earning" && entry.status === "completed") {
+      totalEarned += entry.amount;
+    }
+    if (entry.referenceType === "withdrawal_completed" && entry.status === "completed") {
+      totalWithdrawn += entry.amount;
+    }
+    if (entry.referenceType === "withdrawal_request") {
+      if (entry.status === "pending") {
+        pendingWithdrawal += entry.amount;
+      }
+    }
+  }
+
+  totalEarned = Math.round(totalEarned * 100) / 100;
+  totalWithdrawn = Math.round(totalWithdrawn * 100) / 100;
+  pendingWithdrawal = Math.round(pendingWithdrawal * 100) / 100;
+  const availableBalance = Math.round((totalEarned - totalWithdrawn - pendingWithdrawal) * 100) / 100;
+
+  return {
+    userId,
+    totalEarned,
+    totalWithdrawn,
+    pendingWithdrawal,
+    availableBalance
+  };
+}
+
+function syncClipperBalanceCache(db: DbSchema, userId: string) {
+  if (!db.clipperBalances) {
+    db.clipperBalances = {};
+  }
+  db.clipperBalances[userId] = getDerivedClipperBalance(db, userId);
+}
+
+function refundCampaignEscrow(db: DbSchema, campaign: Campaign) {
+  if (!campaign.escrowBalance || campaign.escrowBalance <= 0) {
+    return;
+  }
+
+  const refundAmount = campaign.escrowBalance;
+  const refId = `escrow-refund-${campaign.id}`;
+
+  if (db.financialLedger && db.financialLedger.some(e => e.referenceId === refId)) {
+    console.log(`Campaign ${campaign.id} already refunded. Skipping.`);
+    campaign.escrowBalance = 0;
+    return;
+  }
+
+  const creatorProf = db.creatorProfiles[campaign.creatorId];
+  if (creatorProf) {
+    creatorProf.walletBalance = Math.round((creatorProf.walletBalance + refundAmount) * 100) / 100;
+  }
+
+  campaign.escrowBalance = 0;
+
+  recordLedgerEntry(db, {
+    referenceId: refId,
+    referenceType: "refund",
+    fromAccount: `campaign_escrow:${campaign.id}`,
+    toAccount: `creator_wallet:${campaign.creatorId}`,
+    userId: campaign.creatorId,
+    campaignId: campaign.id,
+    amount: refundAmount,
+    status: "completed",
+    description: `Refund of unused budget from campaign: ${campaign.title}`
+  });
+
+  // Backward compatibility
+  db.walletHistory.push({
+    id: "tx-" + Math.random().toString(36).substring(2, 9),
+    userId: campaign.creatorId,
+    type: "deposit",
+    amount: refundAmount,
+    status: "Completed",
+    description: `Refund of unused budget from campaign: ${campaign.title}`,
+    createdAt: new Date().toISOString()
+  });
+}
+
+function runFinancialMigration(db: DbSchema) {
+  if (!db.financialLedger) {
+    db.financialLedger = [];
+  }
+  if (!db.clipperBalances) {
+    db.clipperBalances = {};
+  }
+  if (!db.viewPayoutEvents) {
+    db.viewPayoutEvents = [];
+  }
+
+  // 1. Initial campaign escrow migration
+  if (db.campaigns) {
+    for (const c of db.campaigns) {
+      if (c.escrowBalance === undefined) {
+        c.escrowBalance = Math.max(0, Math.round((c.budget - c.spent) * 100) / 100);
+      }
+    }
+  }
+
+  // 2. Map old wallet history to ledger
+  if (db.walletHistory) {
+    for (const tx of db.walletHistory) {
+      const refId = `migrated-tx-${tx.id}`;
+      const alreadyExists = db.financialLedger.some(e => e.referenceId === refId);
+      if (alreadyExists) continue;
+
+      let refType: any = "deposit";
+      let fromAcc = "External";
+      let toAcc = `user_wallet:${tx.userId}`;
+      let status: "pending" | "completed" | "reversed" = tx.status === "Completed" ? "completed" : "reversed";
+
+      if (tx.type === "deposit") {
+        refType = "deposit";
+        fromAcc = "External (Razorpay)";
+        toAcc = `creator_wallet:${tx.userId}`;
+      } else if (tx.type === "payment") {
+        if (tx.description.toLowerCase().includes("escrow lock")) {
+          refType = "escrow_lock";
+          fromAcc = `creator_wallet:${tx.userId}`;
+          toAcc = "campaign_escrow";
+        } else if (tx.description.toLowerCase().includes("refund")) {
+          refType = "refund";
+          fromAcc = "campaign_escrow";
+          toAcc = `creator_wallet:${tx.userId}`;
+        } else {
+          // view payout / clipper earning simulation
+          refType = "clipper_earning";
+          fromAcc = "campaign_escrow";
+          toAcc = `clipper_earnings:${tx.userId}`;
+        }
+      } else if (tx.type === "withdrawal") {
+        refType = "withdrawal_completed";
+        fromAcc = `clipper_pending_withdrawal:${tx.userId}`;
+        toAcc = "External (UPI)";
+      } else if (tx.type === "commission") {
+        refType = "platform_fee";
+        fromAcc = "campaign_escrow";
+        toAcc = "QUOR Platform";
+      }
+
+      db.financialLedger.push({
+        id: "led-" + Math.random().toString(36).substring(2, 9),
+        referenceId: refId,
+        referenceType: refType,
+        fromAccount: fromAcc,
+        toAccount: toAcc,
+        userId: tx.userId,
+        amount: tx.amount,
+        status,
+        description: tx.description,
+        createdAt: tx.createdAt
+      });
+    }
+  }
+
+  // 3. Map payout requests to ledger withdrawal requests
+  if (db.payoutRequests) {
+    for (const p of db.payoutRequests) {
+      const refId = `payout-request-${p.id}`;
+      const alreadyExists = db.financialLedger.some(e => e.referenceId === refId);
+      if (alreadyExists) continue;
+
+      let status: "pending" | "completed" | "reversed" = "pending";
+      if (p.status === "Completed") {
+        status = "completed";
+      } else if (p.status === "Failed") {
+        status = "reversed";
+      }
+
+      db.financialLedger.push({
+        id: "led-" + Math.random().toString(36).substring(2, 9),
+        referenceId: refId,
+        referenceType: "withdrawal_request",
+        fromAccount: `clipper_earnings:${p.clipperId}`,
+        toAccount: `clipper_pending_withdrawal:${p.clipperId}`,
+        userId: p.clipperId,
+        amount: p.amount,
+        status,
+        description: `Withdrawal request to UPI: ${p.upiId} (Migrated)`,
+        createdAt: p.createdAt
+      });
+
+      // If completed, also make sure withdrawal_completed ledger entry exists
+      if (p.status === "Completed") {
+        const compRefId = `payout-complete-${p.id}`;
+        if (!db.financialLedger.some(e => e.referenceId === compRefId)) {
+          db.financialLedger.push({
+            id: "led-" + Math.random().toString(36).substring(2, 9),
+            referenceId: compRefId,
+            referenceType: "withdrawal_completed",
+            fromAccount: `clipper_pending_withdrawal:${p.clipperId}`,
+            toAccount: "External (UPI)",
+            userId: p.clipperId,
+            amount: p.amount,
+            status: "completed",
+            description: `Withdrawal completed to UPI: ${p.upiId} (Migrated)`,
+            createdAt: p.createdAt
+          });
+        }
+      } else if (p.status === "Failed") {
+        const failRefId = `payout-failed-${p.id}`;
+        if (!db.financialLedger.some(e => e.referenceId === failRefId)) {
+          db.financialLedger.push({
+            id: "led-" + Math.random().toString(36).substring(2, 9),
+            referenceId: failRefId,
+            referenceType: "withdrawal_failed",
+            fromAccount: `clipper_pending_withdrawal:${p.clipperId}`,
+            toAccount: `clipper_earnings:${p.clipperId}`,
+            userId: p.clipperId,
+            amount: p.amount,
+            status: "completed",
+            description: `Withdrawal failed (Migrated)`,
+            createdAt: p.createdAt
+          });
+        }
+      }
+    }
+  }
+
+  // Sync clipper balance caches
+  const clipperUserIds = db.users.filter(u => u.role === "clipper").map(u => u.id);
+  for (const cid of clipperUserIds) {
+    syncClipperBalanceCache(db, cid);
+  }
+}
+
 // Helper to load database
 const loadDb = (): DbSchema => {
   let db: DbSchema;
@@ -644,6 +914,9 @@ const loadDb = (): DbSchema => {
       };
     }
   }
+
+  // Run financial double-entry ledger migration/updates
+  runFinancialMigration(db);
 
   // Ensure all users have hashed passwords
   let updated = false;
@@ -1157,23 +1430,47 @@ const startServer = async () => {
       return res.status(400).json({ error: parsed.error.issues[0].message });
     }
     const amount = typeof parsed.data.amount === "number" ? parsed.data.amount : parseFloat(parsed.data.amount);
+    const paymentId = req.body.paymentId || Math.random().toString(36).substring(2, 9);
+    const refId = `deposit-${paymentId}`;
+
     const db = loadDb();
+
+    // Idempotency check
+    if (db.financialLedger) {
+      const existing = db.financialLedger.find(e => e.referenceId === refId);
+      if (existing) {
+        const profile = db.creatorProfiles[req.user.id] || { userId: req.user.id, channelUrl: "", walletBalance: 0 };
+        return res.json({ message: "Wallet successfully funded (idempotent).", balance: profile.walletBalance });
+      }
+    }
+
     let profile = db.creatorProfiles[req.user.id];
     if (!profile) {
       profile = { userId: req.user.id, channelUrl: "", walletBalance: 0 };
       db.creatorProfiles[req.user.id] = profile;
     }
 
-    profile.walletBalance += amount;
+    profile.walletBalance = Math.round((profile.walletBalance + amount) * 100) / 100;
+
+    const ledgerEntry = recordLedgerEntry(db, {
+      referenceId: refId,
+      referenceType: "deposit",
+      fromAccount: "External (Razorpay)",
+      toAccount: `creator_wallet:${req.user.id}`,
+      userId: req.user.id,
+      amount,
+      status: "completed",
+      description: `Fund Added via Razorpay (Payment ID: ${paymentId})`
+    });
 
     const transaction: WalletTransaction = {
-      id: "tx-" + Math.random().toString(36).substring(2, 9),
+      id: "tx-" + paymentId,
       userId: req.user.id,
       type: "deposit",
       amount: amount,
       status: "Completed",
       description: `Fund Added via Razorpay Payment Gateway (UPI ID Simulation)`,
-      createdAt: new Date().toISOString()
+      createdAt: ledgerEntry.createdAt
     };
 
     db.walletHistory.push(transaction);
@@ -1211,10 +1508,12 @@ const startServer = async () => {
       return res.status(400).json({ error: `Insufficient wallet balance. You need ₹${budget}, current balance is ₹${creatorProf?.walletBalance || 0}. Please top-up first!` });
     }
 
-    // Deduct the budget upfront from wallet for campaign running guarantee
-    creatorProf.walletBalance -= Number(budget);
-
     const campaignId = "campaign-" + Math.random().toString(36).substring(2, 9);
+    const refId = `escrow-${campaignId}`;
+
+    // Deduct the budget upfront from wallet for campaign running guarantee
+    creatorProf.walletBalance = Math.round((creatorProf.walletBalance - Number(budget)) * 100) / 100;
+
     const newCampaign: Campaign = {
       id: campaignId,
       creatorId: req.user.id,
@@ -1224,6 +1523,7 @@ const startServer = async () => {
       cpm: Number(cpm),
       budget: Number(budget),
       spent: 0,
+      escrowBalance: Number(budget),
       instructions,
       platform,
       minDuration: Number(minDuration),
@@ -1236,15 +1536,28 @@ const startServer = async () => {
 
     db.campaigns.push(newCampaign);
 
-    // Record wallet deduction transaction
+    // Record to financial ledger
+    const ledgerEntry = recordLedgerEntry(db, {
+      referenceId: refId,
+      referenceType: "escrow_lock",
+      fromAccount: `creator_wallet:${req.user.id}`,
+      toAccount: `campaign_escrow:${campaignId}`,
+      userId: req.user.id,
+      campaignId: campaignId,
+      amount: Number(budget),
+      status: "completed",
+      description: `Escrow lock of ₹${budget} for campaign: ${title}`
+    });
+
+    // Record traditional wallet deduction transaction
     const transaction: WalletTransaction = {
-      id: "tx-" + Math.random().toString(36).substring(2, 9),
+      id: "tx-" + campaignId,
       userId: req.user.id,
       type: "payment",
       amount: Number(budget),
       status: "Completed",
       description: `Escrow lock of ₹${budget} for campaign: ${title}`,
-      createdAt: new Date().toISOString()
+      createdAt: ledgerEntry.createdAt
     };
     db.walletHistory.push(transaction);
 
@@ -1266,7 +1579,12 @@ const startServer = async () => {
       return res.status(403).json({ error: "Unauthorized operation." });
     }
 
-    if (status) campaign.status = status;
+    if (status) {
+      campaign.status = status;
+      if (status === "Completed") {
+        refundCampaignEscrow(db, campaign);
+      }
+    }
     if (title) campaign.title = title;
     if (instructions) campaign.instructions = instructions;
     if (cpm) campaign.cpm = Number(cpm);
@@ -1287,24 +1605,8 @@ const startServer = async () => {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
-    // Refund unspent wallet balance to creator
-    const remainingBudget = campaign.budget - campaign.spent;
-    if (remainingBudget > 0) {
-      const creatorProf = db.creatorProfiles[campaign.creatorId];
-      if (creatorProf) {
-        creatorProf.walletBalance += remainingBudget;
-        // Logs
-        db.walletHistory.push({
-          id: "tx-" + Math.random().toString(36).substring(2, 9),
-          userId: campaign.creatorId,
-          type: "deposit",
-          amount: remainingBudget,
-          status: "Completed",
-          description: `Refund of unused budget from deleted campaign: ${campaign.title}`,
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
+    // Refund unused escrow balance traceably and securely using the new ledger
+    refundCampaignEscrow(db, campaign);
 
     db.campaigns.splice(index, 1);
     saveDb(db);
@@ -1439,35 +1741,18 @@ const startServer = async () => {
       return res.status(400).json({ error: "Please link your UPI ID in your Profile first before requesting withdrawals." });
     }
 
-    // Calculate total net earnings
-    // Let's compute earnings dynamically from approved submissions minus payouts
-    const approvedSubs = db.submissions.filter(s => s.clipperId === req.user.id && s.status === "Approved");
-    let totalEarned = 0;
-    approvedSubs.forEach(sub => {
-      const camp = db.campaigns.find(c => c.id === sub.campaignId);
-      if (camp) {
-        // Clipper role gets 80% (20% platform charge deducted)
-        const netCmsRate = camp.cpm * 0.8;
-        totalEarned += (sub.views / 1000) * netCmsRate;
-      }
-    });
-
-    const totalWithdrawn = db.payoutRequests
-      .filter(p => p.clipperId === req.user.id && p.status === "Completed")
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    const pendingWithdrawal = db.payoutRequests
-      .filter(p => p.clipperId === req.user.id && p.status === "Processing")
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    const availableBalance = totalEarned - totalWithdrawn - pendingWithdrawal;
+    const clipperBalance = getDerivedClipperBalance(db, req.user.id);
+    const availableBalance = clipperBalance.availableBalance;
 
     if (amount > availableBalance) {
       return res.status(400).json({ error: `Insufficient earnings balance. Available is ₹${availableBalance.toFixed(2)}. Tried withdrawing ₹${amount}.` });
     }
 
+    const payoutId = "payout-" + Math.random().toString(36).substring(2, 9);
+    const refId = `payout-request-${payoutId}`;
+
     const newRequest: PayoutRequest = {
-      id: "payout-" + Math.random().toString(36).substring(2, 9),
+      id: payoutId,
       clipperId: req.user.id,
       clipperName: req.user.name,
       upiId: clipperProfile.upiId,
@@ -1477,6 +1762,19 @@ const startServer = async () => {
     };
 
     db.payoutRequests.push(newRequest);
+
+    // Record withdrawal request to financial ledger (starts as pending)
+    recordLedgerEntry(db, {
+      referenceId: refId,
+      referenceType: "withdrawal_request",
+      fromAccount: `clipper_earnings:${req.user.id}`,
+      toAccount: `clipper_pending_withdrawal:${req.user.id}`,
+      userId: req.user.id,
+      amount: Number(amount),
+      status: "pending",
+      description: `Withdrawal request to UPI: ${clipperProfile.upiId}`
+    });
+
     saveDb(db);
 
     res.status(201).json({ message: "Withdrawal request submitted! Send to Admin for processing.", request: newRequest });
@@ -1563,16 +1861,45 @@ const startServer = async () => {
     const { payoutId } = req.params;
     const { status } = req.body; // Completed or Failed
 
+    if (status !== "Completed" && status !== "Failed") {
+      return res.status(400).json({ error: "Invalid status option. Must be 'Completed' or 'Failed'." });
+    }
+
     const db = loadDb();
     const payout = db.payoutRequests.find(p => p.id === payoutId);
     if (!payout) {
       return res.status(404).json({ error: "Payout request not found." });
     }
 
+    if (payout.status !== "Processing") {
+      return res.status(400).json({ error: "Payout request has already been processed." });
+    }
+
     payout.status = status;
 
+    // Retrieve the original pending withdrawal request ledger entry
+    const originalLedgerEntry = db.financialLedger ? db.financialLedger.find(
+      e => e.referenceId === `payout-request-${payoutId}`
+    ) : null;
+
     if (status === "Completed") {
-      // Log wallet transaction for clipper historical tracing
+      if (originalLedgerEntry) {
+        originalLedgerEntry.status = "completed";
+      }
+
+      // Record withdrawal completed ledger entry
+      recordLedgerEntry(db, {
+        referenceId: `payout-complete-${payoutId}`,
+        referenceType: "withdrawal_completed",
+        fromAccount: `clipper_pending_withdrawal:${payout.clipperId}`,
+        toAccount: "External (UPI)",
+        userId: payout.clipperId,
+        amount: payout.amount,
+        status: "completed",
+        description: `Withdrawal completed to UPI: ${payout.upiId}`
+      });
+
+      // Log wallet transaction for compatibility
       db.walletHistory.push({
         id: "tx-" + Math.random().toString(36).substring(2, 9),
         userId: payout.clipperId,
@@ -1582,13 +1909,170 @@ const startServer = async () => {
         description: `Withdrawn to UPI: ${payout.upiId}`,
         createdAt: new Date().toISOString()
       });
+    } else if (status === "Failed") {
+      if (originalLedgerEntry) {
+        originalLedgerEntry.status = "reversed";
+      }
+
+      // Record withdrawal failed ledger entry
+      recordLedgerEntry(db, {
+        referenceId: `payout-failed-${payoutId}`,
+        referenceType: "withdrawal_failed",
+        fromAccount: `clipper_pending_withdrawal:${payout.clipperId}`,
+        toAccount: `clipper_earnings:${payout.clipperId}`,
+        userId: payout.clipperId,
+        amount: payout.amount,
+        status: "completed",
+        description: `Withdrawal failed. Refunded to available balance.`
+      });
+
+      // Log wallet transaction for compatibility
+      db.walletHistory.push({
+        id: "tx-" + Math.random().toString(36).substring(2, 9),
+        userId: payout.clipperId,
+        type: "deposit",
+        amount: payout.amount,
+        status: "Completed",
+        description: `Withdrawn request failed. Refunded to available balance.`,
+        createdAt: new Date().toISOString()
+      });
     }
+
+    // Force sync balance cache
+    syncClipperBalanceCache(db, payout.clipperId);
 
     saveDb(db);
     res.json({ message: `Payout request marked as ${status}.`, payout });
   });
 
   // VIEW TRACKING ENGINE (Manual Trigger or automatic increment)
+  function processViewPayout(
+    db: DbSchema,
+    subId: string,
+    addedViews: number,
+    isBotRisk: boolean = false,
+    batchId: string = Math.random().toString(36).substring(2, 9)
+  ): { success: boolean; grossAmount?: number; error?: string } {
+    const sub = db.submissions.find(s => s.id === subId);
+    if (!sub) {
+      return { success: false, error: "Submission not found" };
+    }
+
+    if (sub.status !== "Approved") {
+      return { success: false, error: "Submission is not approved" };
+    }
+
+    // Idempotency check: if a ledger entry with referenceId ending in -${batchId} already exists, it is a duplicate!
+    if (db.financialLedger && db.financialLedger.some(e => e.referenceId.endsWith(`-${batchId}`))) {
+      return { success: false, error: "Payout transaction already processed" };
+    }
+
+    const campaign = db.campaigns.find(c => c.id === sub.campaignId);
+    if (!campaign) {
+      return { success: false, error: "Campaign not found" };
+    }
+
+    if (campaign.status !== "Active") {
+      return { success: false, error: "Campaign is not active" };
+    }
+
+    const remainingBudget = campaign.escrowBalance || 0;
+    if (remainingBudget <= 0) {
+      campaign.status = "Completed";
+      return { success: false, error: "Campaign escrow budget fully spent" };
+    }
+
+    const creatorCost = (addedViews / 1000) * campaign.cpm;
+    const finalCost = Math.min(creatorCost, remainingBudget);
+    
+    const finalAddedViews = Math.round((finalCost / campaign.cpm) * 1000);
+    const roundedCost = Math.round(finalCost * 100) / 100;
+
+    if (roundedCost <= 0) {
+      return { success: false, error: "Payout amount is too small or zero" };
+    }
+
+    const previousPaidViews = db.viewPayoutEvents ? db.viewPayoutEvents.filter(e => e.submissionId === sub.id).reduce((sum, e) => sum + e.verifiedViews, 0) : 0;
+    
+    // Distribute earnings: 80% to Clipper, 20% to Platform
+    const clipperShare = Math.round(roundedCost * 0.8 * 100) / 100;
+    const platformFee = Math.round((roundedCost - clipperShare) * 100) / 100;
+
+    const clipperRefId = `view-payout-clipper-${sub.id}-${previousPaidViews}-${sub.views + finalAddedViews}-${batchId}`;
+    const platformRefId = `view-payout-platform-${sub.id}-${previousPaidViews}-${sub.views + finalAddedViews}-${batchId}`;
+
+    // Record to financial ledger (Clipper Share)
+    recordLedgerEntry(db, {
+      referenceId: clipperRefId,
+      referenceType: "clipper_earning",
+      fromAccount: `campaign_escrow:${campaign.id}`,
+      toAccount: `clipper_earnings:${sub.clipperId}`,
+      userId: sub.clipperId,
+      campaignId: campaign.id,
+      submissionId: sub.id,
+      amount: clipperShare,
+      status: "completed",
+      description: `Payout for ${sub.clipperName} views (+${finalAddedViews} views)`
+    });
+
+    // Record to financial ledger (Platform Fee)
+    recordLedgerEntry(db, {
+      referenceId: platformRefId,
+      referenceType: "platform_fee",
+      fromAccount: `campaign_escrow:${campaign.id}`,
+      toAccount: "QUOR Platform",
+      campaignId: campaign.id,
+      submissionId: sub.id,
+      amount: platformFee,
+      status: "completed",
+      description: `Platform commission 20% for ${sub.clipperName} views`
+    });
+
+    // Log ViewPayoutEvent
+    if (!db.viewPayoutEvents) {
+      db.viewPayoutEvents = [];
+    }
+    db.viewPayoutEvents.push({
+      submissionId: sub.id,
+      previousViews: previousPaidViews,
+      newViews: sub.views + finalAddedViews,
+      verifiedViews: finalAddedViews,
+      grossAmount: roundedCost,
+      clipperAmount: clipperShare,
+      platformAmount: platformFee,
+      processedAt: new Date().toISOString()
+    });
+
+    sub.views += finalAddedViews;
+    sub.lastFetchedViews = new Date().toISOString();
+    
+    campaign.escrowBalance = Math.round((campaign.escrowBalance - roundedCost) * 100) / 100;
+    campaign.spent = Math.round((campaign.spent + roundedCost) * 100) / 100;
+
+    if (campaign.escrowBalance <= 0) {
+      campaign.status = "Completed";
+    }
+
+    // If bot detection happens, we still register but we can label it or flag it
+    let desc = `Payout for ${sub.clipperName} views (+${finalAddedViews} views)`;
+    if (isBotRisk) {
+      desc += " - [FLAGGED: Unusually High Velocity detected - Fraud check triggered]";
+    }
+
+    // Record wallet payout transaction on creator for compatibility
+    db.walletHistory.push({
+      id: "tx-" + batchId,
+      userId: campaign.creatorId,
+      type: "payment",
+      amount: roundedCost,
+      status: "Completed",
+      description: desc,
+      createdAt: new Date().toISOString()
+    });
+
+    return { success: true, grossAmount: roundedCost };
+  }
+
   const executeViewTracking = () => {
     const db = loadDb();
     let updatedCount = 0;
@@ -1597,55 +2081,13 @@ const startServer = async () => {
       if (sub.status === "Approved") {
         const campaign = db.campaigns.find(c => c.id === sub.campaignId);
         if (campaign && campaign.status === "Active") {
-          // Calculate budget remaining
-          const remainingBudget = campaign.budget - campaign.spent;
-          if (remainingBudget <= 0) {
-            campaign.status = "Completed";
-            return;
-          }
-
-          // Generate simulated periodic organic views (e.g., between 500 - 3500 views per tick)
-          // Bot protection check velocity: once in a while generate huge bot check velocity (e.g. 50,000 views)
           const isBotRisk = Math.random() < 0.05; // 5% chance
           const addedViews = isBotRisk ? 42000 : Math.floor(Math.random() * 1500) + 300;
           
-          const creatorCost = (addedViews / 1000) * campaign.cpm;
-          const finalCost = Math.min(creatorCost, remainingBudget);
-          
-          // Re-calculate view proportion if scaled back by budget
-          const finalAddedViews = Math.round((finalCost / campaign.cpm) * 1000);
-
-          sub.views += finalAddedViews;
-          sub.lastFetchedViews = new Date().toISOString();
-          campaign.spent += finalCost;
-
-          // Double check if campaign is fully spent
-          if (campaign.spent >= campaign.budget) {
-            campaign.status = "Completed";
+          const result = processViewPayout(db, sub.id, addedViews, isBotRisk);
+          if (result.success) {
+            updatedCount++;
           }
-
-          // Distribute earnings: 80% to Clipper, 20% to Platform
-          const clipperEarnings = finalCost * 0.8;
-          const platformFee = finalCost * 0.2;
-
-          // If bot detection happens, we still register but we can label it or flag it
-          let desc = `Payout for Samir Kulkarni views (+${finalAddedViews} views)`;
-          if (isBotRisk) {
-            desc += " - [FLAGGED: Unusually High Velocity detected - Fraud check triggered]";
-          }
-
-          // Record wallet payout transaction on creator
-          db.walletHistory.push({
-            id: "tx-" + Math.random().toString(36).substring(2, 9),
-            userId: campaign.creatorId,
-            type: "payment",
-            amount: finalCost,
-            status: "Completed",
-            description: desc,
-            createdAt: new Date().toISOString()
-          });
-
-          updatedCount++;
         }
       }
     });
@@ -1683,6 +2125,96 @@ const startServer = async () => {
     db.contacts.push(newContact);
     saveDb(db);
     res.status(201).json({ success: true, ticketId, contact: newContact });
+  });
+
+  // Admin Financial Dashboard Endpoints
+  app.get("/api/admin/finance/overview", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const db = loadDb();
+    
+    const ledger = db.financialLedger || [];
+    
+    // 1. Total Deposits (completed "deposit" entries)
+    const totalDeposits = ledger
+      .filter(e => e.referenceType === "deposit" && e.status === "completed")
+      .reduce((sum, e) => sum + e.amount, 0);
+      
+    // 2. Total Escrow Locked (completed "escrow_lock" entries)
+    const totalEscrowLocked = ledger
+      .filter(e => e.referenceType === "escrow_lock" && e.status === "completed")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // 3. Total Escrow Released / Paid (completed "clipper_earning" + "platform_fee")
+    const totalEscrowReleased = ledger
+      .filter(e => (e.referenceType === "clipper_earning" || e.referenceType === "platform_fee") && e.status === "completed")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // 4. Total Platform Fees Earned (completed "platform_fee")
+    const totalPlatformFees = ledger
+      .filter(e => e.referenceType === "platform_fee" && e.status === "completed")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // 5. Total Withdrawals Completed (completed "withdrawal_completed")
+    const totalWithdrawalsCompleted = ledger
+      .filter(e => e.referenceType === "withdrawal_completed" && e.status === "completed")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // 6. Total Pending Withdrawals (pending "withdrawal_request")
+    const totalPendingWithdrawals = ledger
+      .filter(e => e.referenceType === "withdrawal_request" && e.status === "pending")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // 7. Reconstructed system balances
+    const creatorWallets = Object.values(db.creatorProfiles).reduce((sum, p) => sum + (p.walletBalance || 0), 0);
+    const campaignEscrows = db.campaigns.reduce((sum, c) => sum + (c.escrowBalance || 0), 0);
+    
+    const clipperUserIds = db.users.filter(u => u.role === "clipper").map(u => u.id);
+    let clipperBalancesSum = 0;
+    for (const cid of clipperUserIds) {
+      const bal = getDerivedClipperBalance(db, cid);
+      clipperBalancesSum += bal.availableBalance;
+    }
+
+    // Double-Entry Equation Check:
+    // Assets (Total Deposits - Total Withdrawals) should equal Liabilities + Equity (Creator Wallets + Escrow Balances + Clipper Balances + Platform Earnings + Pending Withdrawals)
+    const netAssets = totalDeposits - totalWithdrawalsCompleted;
+    const netLiabilitiesAndEquity = creatorWallets + campaignEscrows + clipperBalancesSum + totalPlatformFees + totalPendingWithdrawals;
+    const balanceDifference = Math.abs(netAssets - netLiabilitiesAndEquity);
+    const isBalanced = balanceDifference < 1.0; // Allow 1 Rupee for minor rounding deviations
+
+    res.json({
+      overview: {
+        totalDeposits: Math.round(totalDeposits * 100) / 100,
+        totalEscrowLocked: Math.round(totalEscrowLocked * 100) / 100,
+        totalEscrowReleased: Math.round(totalEscrowReleased * 100) / 100,
+        totalPlatformFees: Math.round(totalPlatformFees * 100) / 100,
+        totalWithdrawalsCompleted: Math.round(totalWithdrawalsCompleted * 100) / 100,
+        totalPendingWithdrawals: Math.round(totalPendingWithdrawals * 100) / 100,
+      },
+      systemSanity: {
+        netAssets: Math.round(netAssets * 100) / 100,
+        creatorWallets: Math.round(creatorWallets * 100) / 100,
+        campaignEscrows: Math.round(campaignEscrows * 100) / 100,
+        clipperAvailableBalances: Math.round(clipperBalancesSum * 100) / 100,
+        platformFees: Math.round(totalPlatformFees * 100) / 100,
+        pendingWithdrawals: Math.round(totalPendingWithdrawals * 100) / 100,
+        balanceDifference: Math.round(balanceDifference * 100) / 100,
+        isBalanced
+      }
+    });
+  });
+
+  app.get("/api/admin/finance/ledger", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const db = loadDb();
+    const ledger = db.financialLedger || [];
+    // Sort by descending createdAt time
+    const sorted = [...ledger].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    res.json(sorted);
+  });
+
+  app.get("/api/admin/finance/pending-payouts", authenticateUser, requireOwnerAdmin, (req: any, res) => {
+    const db = loadDb();
+    const pending = db.payoutRequests.filter(p => p.status === "Processing");
+    res.json(pending);
   });
 
   // System stats API for Admin & landing page counts

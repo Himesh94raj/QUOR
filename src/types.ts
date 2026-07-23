@@ -49,6 +49,7 @@ export interface Campaign {
   cpm: number; // in ₹ INR
   budget: number; // in ₹ INR
   spent: number; // in ₹ INR
+  escrowBalance?: number; // in ₹ INR
   instructions: string;
   platform: CampaignPlatform;
   minDuration: number; // in seconds
@@ -100,6 +101,50 @@ export interface PayoutRequest {
   createdAt: string;
 }
 
+export interface FinancialLedgerEntry {
+  id: string;
+  referenceId: string;
+  referenceType:
+    | "deposit"
+    | "escrow_lock"
+    | "escrow_release"
+    | "clipper_earning"
+    | "platform_fee"
+    | "withdrawal_request"
+    | "withdrawal_completed"
+    | "withdrawal_failed"
+    | "refund";
+
+  fromAccount: string;
+  toAccount: string;
+  userId?: string;
+  campaignId?: string;
+  submissionId?: string;
+  amount: number;
+  status: "pending" | "completed" | "reversed";
+  description: string;
+  createdAt: string;
+}
+
+export interface ClipperBalance {
+  userId: string;
+  totalEarned: number;
+  totalWithdrawn: number;
+  pendingWithdrawal: number;
+  availableBalance: number;
+}
+
+export interface ViewPayoutEvent {
+  submissionId: string;
+  previousViews: number;
+  newViews: number;
+  verifiedViews: number;
+  grossAmount: number;
+  clipperAmount: number;
+  platformAmount: number;
+  processedAt: string;
+}
+
 export interface DbSchema {
   users: User[];
   clipperProfiles: Record<string, ClipperProfile>; // key is userId
@@ -109,6 +154,9 @@ export interface DbSchema {
   walletHistory: WalletTransaction[];
   payoutRequests: PayoutRequest[];
   contacts?: ContactMessage[];
+  financialLedger?: FinancialLedgerEntry[];
+  clipperBalances?: Record<string, ClipperBalance>;
+  viewPayoutEvents?: ViewPayoutEvent[];
 }
 
 export interface ContactMessage {
