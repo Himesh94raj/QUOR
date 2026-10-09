@@ -9,6 +9,9 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config();
 import { DbSchema, User, Campaign, Submission, ClipperProfile, CreatorProfile, WalletTransaction, PayoutRequest, ContactMessage, FinancialLedgerEntry, ClipperBalance, ViewPayoutEvent, AuditEvent, FraudEvent, PaymentRecord } from "./src/types.js";
 import {
   detectPlatform,
@@ -1738,6 +1741,19 @@ const startServer = async () => {
         });
       }
 
+      // Get old balance before credit
+      let oldBalance = 0;
+      if (dbProvider === "supabase") {
+        const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", req.user.id).maybeSingle();
+        if (profileData) {
+          oldBalance = Number(profileData.wallet_balance) / 100;
+        }
+      } else {
+        const db = loadDb();
+        const profile = db.creatorProfiles[req.user.id];
+        oldBalance = profile ? profile.walletBalance : 0;
+      }
+
       // Process ledger deposit atomically
       const refId = `payment-verify-${paymentId}`;
       const ledgerId = `led-${paymentId}`;
@@ -1767,12 +1783,6 @@ const startServer = async () => {
         });
       }
 
-      // Log successful verification and payment
-      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, orderId, req.user.id, "frontend", {
-        paymentId,
-        orderId
-      });
-
       // Fetch updated balance and transaction history for compatibility
       let walletBalance = 0;
       let transaction: any = null;
@@ -1792,6 +1802,23 @@ const startServer = async () => {
         walletBalance = profile ? profile.walletBalance : 0;
         transaction = db.walletHistory.find(tx => tx.id === txId);
       }
+
+      console.log(`[WALLET_CREDIT_TRACE] Wallet credit operation detected!
+        Route: /api/payments/verify
+        Authenticated User ID: ${req.user.id}
+        Payment ID: ${paymentId}
+        Order ID: ${orderId}
+        Provider: ${paymentRecord.provider}
+        Verification Result: SUCCESS
+        Ledger Transaction ID: ${txId}
+        Old Balance: ₹${oldBalance}
+        New Balance: ₹${walletBalance}`);
+
+      // Log successful verification and payment
+      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, orderId, req.user.id, "frontend", {
+        paymentId,
+        orderId
+      });
 
       const updatedRecord = await paymentRepository.findByOrderId(orderId);
 
@@ -1856,139 +1883,7 @@ const startServer = async () => {
   });
 
   app.post("/api/verify-payment", authenticateUser, async (req: any, res) => {
-    const { order_id, payment_id, razorpay_signature } = req.body;
-
-    if (!order_id || !payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: "Missing required parameters: order_id, payment_id, and razorpay_signature are required." });
-    }
-
-    try {
-      const paymentRecord = await paymentRepository.findByOrderId(order_id);
-      if (!paymentRecord) {
-        return res.status(404).json({ error: "Payment record not found for the specified order_id." });
-      }
-
-      if (paymentRecord.user_id !== req.user.id) {
-        return res.status(403).json({ error: "Unauthorized: This payment order does not belong to you." });
-      }
-
-      // PAYMENT STATE MACHINE ENFORCEMENT
-      if (paymentRecord.status === "failed") {
-        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
-          error: "Forbidden state transition: Cannot transition from failed to paid."
-        });
-        return res.status(400).json({ error: "Forbidden state transition: Cannot transition from failed to paid." });
-      }
-
-      if (paymentRecord.status === "paid") {
-        // Fetch updated balance for compatibility
-        let walletBalance = 0;
-        if (dbProvider === "supabase") {
-          const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", req.user.id).maybeSingle();
-          if (profileData) {
-            walletBalance = Number(profileData.wallet_balance) / 100;
-          }
-        } else {
-          const db = loadDb();
-          const profile = db.creatorProfiles[req.user.id];
-          walletBalance = profile ? profile.walletBalance : 0;
-        }
-
-        return res.json({
-          success: true,
-          message: "Payment has already been verified and credited (idempotent)."
-        });
-      }
-
-      // Prevent payment ID reuse
-      let isPaymentIdReused = false;
-      if (dbProvider === "supabase") {
-        const { data, error } = await supabase.from("payments").select("id").eq("provider_payment_id", payment_id).eq("status", "paid").maybeSingle();
-        if (!error && data) {
-          isPaymentIdReused = true;
-        }
-      } else {
-        const db = loadDb();
-        if (db.payments) {
-          isPaymentIdReused = db.payments.some(p => p.provider_payment_id === payment_id && p.status === "paid");
-        }
-      }
-
-      if (isPaymentIdReused) {
-        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
-          error: "Payment ID has already been used and verified."
-        });
-        return res.status(400).json({ error: "Payment ID has already been used and verified." });
-      }
-
-      // Verification using the provider
-      const provider = getPaymentProvider();
-      const result = await provider.verifyPayment({
-        orderId: order_id,
-        paymentId: payment_id,
-        signature: razorpay_signature
-      });
-
-      if (!result.success) {
-        paymentRecord.status = "failed";
-        paymentRecord.verification_attempts += 1;
-        await paymentRepository.updatePayment(paymentRecord);
-
-        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
-          error: result.error || "Payment verification failed"
-        });
-        await createPaymentAuditEvent("PAYMENT_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
-          reason: result.error || "Payment verification failed"
-        });
-
-        return res.status(400).json({
-          success: false,
-          error: result.error || "Signature verification failed"
-        });
-      }
-
-      // Atomic deposit to ledger
-      const refId = `payment-verify-${payment_id}`;
-      const ledgerId = `led-${payment_id}`;
-      const txId = `tx-${payment_id}`;
-      const auditId = `aud-${payment_id}`;
-
-      const depositResult = await paymentRepository.depositCreatorFundsRpc({
-        userId: req.user.id,
-        orderId: order_id,
-        paymentId: payment_id,
-        amountPaise: paymentRecord.amount_paise,
-        provider: paymentRecord.provider,
-        currency: paymentRecord.currency || "INR",
-        refId,
-        ledgerId,
-        txId,
-        auditId
-      });
-
-      if (!depositResult.success) {
-        await createPaymentAuditEvent("PAYMENT_VERIFICATION_FAILED", paymentRecord.id, order_id, req.user.id, "frontend", {
-          error: depositResult.error || "Atomic ledger funding operation failed."
-        });
-        return res.status(500).json({
-          success: false,
-          error: depositResult.error || "Atomic ledger funding operation failed."
-        });
-      }
-
-      await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, order_id, req.user.id, "frontend", {
-        paymentId: payment_id,
-        orderId: order_id
-      });
-
-      res.json({
-        success: true,
-        message: "Payment successfully verified and credited."
-      });
-    } catch (err: any) {
-      console.error("Verification error:", err);
-      res.status(500).json({ error: err.message || "Internal verification error." });
-    }
+    return res.status(400).json({ error: "Direct/legacy wallet verification routes are disabled. Please use /api/payments/verify instead." });
   });
 
   app.post("/api/payments/webhook", async (req: any, res) => {
@@ -2195,6 +2090,19 @@ const startServer = async () => {
         return res.status(400).json({ error: "Payment ID has already been used and verified." });
       }
 
+      // Get old balance before credit
+      let oldBalance = 0;
+      if (dbProvider === "supabase") {
+        const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", paymentRecord.user_id).maybeSingle();
+        if (profileData) {
+          oldBalance = Number(profileData.wallet_balance) / 100;
+        }
+      } else {
+        const db = loadDb();
+        const profile = db.creatorProfiles[paymentRecord.user_id];
+        oldBalance = profile ? profile.walletBalance : 0;
+      }
+
       // Atomically deposit funds via the double-entry RPC
       const refId = `payment-verify-${finalPaymentId}`;
       const ledgerId = `led-${finalPaymentId}`;
@@ -2218,6 +2126,30 @@ const startServer = async () => {
         await webhookEventRepository.updateEventStatus("razorpay", eventId, "failed");
         return res.status(500).json({ error: depositResult.error || "Atomic ledger funding operation failed." });
       }
+
+      // Get new balance after credit
+      let newBalance = 0;
+      if (dbProvider === "supabase") {
+        const { data: profileData } = await supabase.from("creator_profiles").select("wallet_balance").eq("user_id", paymentRecord.user_id).maybeSingle();
+        if (profileData) {
+          newBalance = Number(profileData.wallet_balance) / 100;
+        }
+      } else {
+        const db = loadDb();
+        const profile = db.creatorProfiles[paymentRecord.user_id];
+        newBalance = profile ? profile.walletBalance : 0;
+      }
+
+      console.log(`[WALLET_CREDIT_TRACE] Wallet credit operation detected!
+        Route: /api/payments/webhook
+        Authenticated User ID: ${paymentRecord.user_id}
+        Payment ID: ${finalPaymentId}
+        Order ID: ${orderId}
+        Provider: ${paymentRecord.provider}
+        Verification Result: SUCCESS
+        Ledger Transaction ID: ${txId}
+        Old Balance: ₹${oldBalance}
+        New Balance: ₹${newBalance}`);
 
       // Log successful verification and payment via webhook
       await createPaymentAuditEvent("PAYMENT_VERIFIED", paymentRecord.id, orderId, paymentRecord.user_id, "webhook", {

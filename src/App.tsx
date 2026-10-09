@@ -359,47 +359,6 @@ export default function App() {
       const { provider, testMode, order } = orderData;
       const orderId = order.id;
 
-      // In production Razorpay mode, NEVER simulate a successful payment.
-      // Remove any frontend fallback when PAYMENT_PROVIDER=razorpay (testMode is false)
-      if (testMode || provider === "mock") {
-        showToast("Mock provider detected. Simulating successful Razorpay payment...", "success");
-        
-        // Call verification endpoint /api/payments/verify with mock signature
-        const verifyRes = await fetch(`${API_BASE}/api/payments/verify`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeader()
-          },
-          body: JSON.stringify({
-            orderId: orderId,
-            paymentId: "pay_mock_" + Math.random().toString(36).substring(2, 9),
-            signature: "signature_mock_success",
-            amountPaise,
-            currency: "INR"
-          })
-        });
-
-        const verifyData = await verifyRes.json();
-        if (!verifyRes.ok) {
-          throw new Error(verifyData.error || "Failed to verify payment");
-        }
-
-        // Fetch updated profile
-        const profileRes = await fetch(`${API_BASE}/api/creator/profile`, {
-          headers: { ...getAuthHeader() }
-        });
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
-          setCreatorProfile(profileData.profile);
-        }
-
-        showToast(`Success! Deposited ₹${depositAmount} securely into escrow wallet (Mock).`, "success");
-        setShowDepositModal(false);
-        fetchPlatformStats();
-        return;
-      }
-
       // 2. Open Razorpay checkout modal (Only in real Razorpay mode)
       const keyId = (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || "rzp_test_TGwV4IG0QQsWn0";
 

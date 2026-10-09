@@ -450,7 +450,74 @@ async function runRazorpayIntegrationTests() {
     assert(scriptThrewError === true, "Must throw error when Razorpay script is missing");
     console.log("\x1b[32m✔ Scenario 16 Passed successfully!\x1b[0m\n");
 
-    console.log("\x1b[1;32m🎉 ALL 16 RAZORPAY INTEGRATION SCENARIOS PASSED PERFECTLY! 🎉\x1b[0m\n");
+    // --- Scenario 17: Clicking "Complete Deposit" without completing Razorpay Checkout ---
+    console.log("👉 Scenario 17: Clicking 'Complete Deposit' without completing Razorpay Checkout");
+    const auditTestUserId = "user_test_click_deposit";
+    const dbTest = loadDb();
+    dbTest.creatorProfiles[auditTestUserId] = { userId: auditTestUserId, channelUrl: "", walletBalance: 100 };
+    dbTest.payments = dbTest.payments || [];
+    dbTest.financialLedger = dbTest.financialLedger || [];
+    dbTest.auditEvents = dbTest.auditEvents || [];
+
+    const orderIdUncompleted = "order_uncompleted_123";
+    const uncompletedPayment: PaymentRecord = {
+      id: "pay_uncompleted_rec",
+      provider: "razorpay",
+      provider_order_id: orderIdUncompleted,
+      user_id: auditTestUserId,
+      amount_paise: 5000,
+      currency: "INR",
+      status: "created",
+      verification_attempts: 0,
+      created_at: new Date().toISOString()
+    };
+    dbTest.payments.push(uncompletedPayment);
+    saveDb(dbTest);
+
+    // Since Checkout is not completed, no verification or deposit endpoint is hit
+    const dbAfterUncompleted = loadDb();
+    const profileAfterUncompleted = dbAfterUncompleted.creatorProfiles[auditTestUserId];
+    assert(profileAfterUncompleted.walletBalance === 100, "Wallet balance must remain unchanged");
+    const ledgerEntry = dbAfterUncompleted.financialLedger.find(e => e.referenceId.includes(orderIdUncompleted));
+    assert(ledgerEntry === undefined, "Ledger must not contain entry for uncompleted payment");
+    const verifiedEvent = dbAfterUncompleted.auditEvents.find(e => e.action === "PAYMENT_VERIFIED" && e.metadata?.orderId === orderIdUncompleted);
+    assert(verifiedEvent === undefined, "No PAYMENT_VERIFIED audit event must exist");
+    console.log("\x1b[32m✔ Scenario 17 Passed successfully!\x1b[0m\n");
+
+    // --- Scenario 18: A fabricated payment response must result in no credit and no ledger change ---
+    console.log("👉 Scenario 18: A fabricated payment response must fail");
+    const orderIdFabricated = "order_fabricated_123";
+    const fabricatedPayment: PaymentRecord = {
+      id: "pay_fabricated_rec",
+      provider: "razorpay",
+      provider_order_id: orderIdFabricated,
+      user_id: auditTestUserId,
+      amount_paise: 5000,
+      currency: "INR",
+      status: "created",
+      verification_attempts: 0,
+      created_at: new Date().toISOString()
+    };
+    const dbFabBefore = loadDb();
+    dbFabBefore.payments.push(fabricatedPayment);
+    saveDb(dbFabBefore);
+
+    // Fabricated verification request fails on the Razorpay provider
+    const fabricatedVerifyRes = await rzpProv.verifyPayment({
+      orderId: orderIdFabricated,
+      paymentId: "pay_fabricated_id_abc",
+      signature: "fabricated_signature_123"
+    });
+    assert(fabricatedVerifyRes.success === false, "Fabricated payment verification must fail");
+
+    const dbFabAfter = loadDb();
+    const profileFab = dbFabAfter.creatorProfiles[auditTestUserId];
+    assert(profileFab.walletBalance === 100, "Wallet balance must remain unchanged on fabrication");
+    const fabLedger = dbFabAfter.financialLedger.find(e => e.referenceId.includes("pay_fabricated_id_abc"));
+    assert(fabLedger === undefined, "Ledger must remain unchanged on fabrication");
+    console.log("\x1b[32m✔ Scenario 18 Passed successfully!\x1b[0m\n");
+
+    console.log("\x1b[1;32m🎉 ALL 18 RAZORPAY INTEGRATION SCENARIOS PASSED PERFECTLY! 🎉\x1b[0m\n");
   } finally {
     // Restore original environment
     process.env.PAYMENT_PROVIDER = originalProvider;

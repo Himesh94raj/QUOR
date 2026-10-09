@@ -62,7 +62,7 @@ export const ContactView: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium text-gray-400">Hotline Number</p>
-                <p className="text-white mt-0.5">+91 9142375006</p>
+                <p className="text-white mt-0.5"></p>
               </div>
             </div>
 
